@@ -8,8 +8,13 @@ Requirements/criteria are `docs/REQUIREMENTS.md` (FR-001..FR-011) and `docs/ACCE
 ## P0 — Why this plan is shaped this way (read if you are a fresh session)
 
 This branch (`experiment/GOV-004`) is the **interrupted-session recovery** experiment
-(`docs/EXPERIMENT-BOUNDARY.md` → GOV-004 protocol, AC-015). Work is expected to stop mid-implementation and be
-resumed by a later session with **no conversational context**. Therefore:
+(`docs/EXPERIMENT-BOUNDARY.md` → GOV-004 protocol, AC-015). The frozen protocol is: stop **deliberately, before any
+product-code edit**, once committed planning artifacts are sufficient to resume; a later, fresh Claude Code session
+with **no conversational context** then records what it can recover from the repository alone. **This plan's own
+existence is the stopping point of the current evaluator run** — the current session does not execute M0 or any
+later milestone. Everything below (M0–M12, the checkpoint discussion in P6) describes work for whichever session
+performs the actual implementation after this recovery experiment concludes, not for the session that authored this
+plan. Therefore:
 
 - P0.1 Every milestone leaves the repo coherent: it typechecks, and `npm run check` passes at the end of each
   milestone. A milestone is never half-landed.
@@ -17,8 +22,10 @@ resumed by a later session with **no conversational context**. Therefore:
   provider → domain/idempotency → HTTP transport → SSE/stream coordination → frontend → cross-cutting → evidence.
 - P0.3 One commit per milestone (more is fine; fewer is not). Commit message: `feat(<layer>): M<n> <goal>` with a body
   listing the FR/AC advanced, so `git log --oneline` alone reveals the resume point.
-- P0.4 **M6 is the recommended STOP checkpoint** (P6 below). It is the last point where the API is complete and
-  provable without any streaming or browser machinery.
+- P0.4 **This evaluator run's actual boundary is immediately after plan approval, before M0** — no product code is
+  written in this session. **M6 is only a suggested future implementation checkpoint** (P6 below), offered for
+  whichever session later performs the implementation; it is not where this session stops, because this session does
+  not begin implementation at all.
 - P0.5 The plan is the durable artifact. Do not delete or rewrite a milestone when it is done — append `[DONE <sha>]`
   to its header instead. That is how the next session reads progress.
 
@@ -48,7 +55,7 @@ resumed by a later session with **no conversational context**. Therefore:
 | M3 | Deterministic provider + test variants | `apps/api` provider | yes |
 | M4 | Domain: send, run, retry, reconcile | `apps/api` domain | yes |
 | M5 | HTTP transport, non-streaming routes | `apps/api` http | yes |
-| M6 | Bootstrap, config, health, shutdown | `apps/api` ops | **recommended STOP** |
+| M6 | Bootstrap, config, health, shutdown | `apps/api` ops | suggested future checkpoint (see P0.4, P6) |
 | M7 | Stream coordination + SSE endpoint | `apps/api` stream | yes |
 | M8 | Web foundation: client, reducer, URL hook | `apps/web` state | yes |
 | M9 | Web UI + stream hook | `apps/web` components | yes |
@@ -189,7 +196,7 @@ client, and evidence.
 - **Advances.** FR-002, FR-009, FR-010, AC-004, AC-019, AC-021.
 - **Commit.** `feat(api): M5 Fastify routes for conversations, messages, retry with one error envelope`
 
-## M6 — Bootstrap, config, health, shutdown  ← **RECOMMENDED STOP CHECKPOINT**
+## M6 — Bootstrap, config, health, shutdown  ← **suggested future checkpoint, not this session's boundary (see P0.4)**
 
 - **Goal.** A runnable server: validated env config, `GET /health`, startup reconciliation, clean shutdown.
 - **Dependencies.** M5.
@@ -203,18 +210,25 @@ client, and evidence.
 - **Advances.** FR-002 (R7), FR-006, FR-010, FR-011, AC-001, AC-005, AC-014.
 - **Commit.** `feat(api): M6 config validation, health endpoint, graceful shutdown`
 
-### P6 — Why the stop falls here
+### P6 — Why M6 is offered as a *future* checkpoint (not why this session stops there)
 
-At the end of M6 the repo contains: the complete shared contract surface, a persisted schema with every invariant
-enforced by the storage engine, a deterministic provider, all domain state transitions with both idempotency keys, all
-non-streaming HTTP routes, a validated configuration surface, and a green `npm run check`. Fourteen acceptance criteria
-(AC-001, 003–010, 014, 016, 017, 019, 021) already have automated evidence, and the remaining work is three clean
-verticals — SSE (M7), client (M8–M10), evidence (M11–M12) — each specified in `SPECS.md` and sequenced below. Nothing
-in M7–M12 requires a decision that was made only in conversation.
+**This session does not reach M6, or M0.** Per `docs/EXPERIMENT-BOUNDARY.md`'s GOV-004 protocol, the current
+evaluator run stops as soon as the plan itself is approved and committed — before any product-code milestone begins.
+The discussion below is guidance left for whichever session eventually implements this plan (after the recovery
+experiment concludes), explaining why M6 is a good place *for that future session* to pause if it, in turn, wants a
+natural mid-implementation checkpoint. It is not a description of this session's own stopping point.
 
-If the session stops **before** M6, stop at the end of whichever milestone last completed and append `[DONE <sha>]` to
-its header; every milestone boundary is coherent by construction (P0.1). Do not stop mid-milestone; if you must,
-revert the partial work rather than commit a repo that fails `npm run check`.
+At the end of M6, the repo would contain: the complete shared contract surface, a persisted schema with every
+invariant enforced by the storage engine, a deterministic provider, all domain state transitions with both
+idempotency keys, all non-streaming HTTP routes, a validated configuration surface, and a green `npm run check`.
+Fourteen acceptance criteria (AC-001, 003–010, 014, 016, 017, 019, 021) would already have automated evidence, and
+the remaining work would be three clean verticals — SSE (M7), client (M8–M10), evidence (M11–M12) — each specified
+in `SPECS.md` and sequenced below. Nothing in M7–M12 requires a decision that was made only in conversation.
+
+For a future implementing session that stops **before** M6, the same rule applies: stop at the end of whichever
+milestone last completed and append `[DONE <sha>]` to its header; every milestone boundary is coherent by
+construction (P0.1). Do not stop mid-milestone; if you must, revert the partial work rather than commit a repo that
+fails `npm run check`.
 
 ---
 
