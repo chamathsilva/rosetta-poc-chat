@@ -33,11 +33,21 @@ Style: one h3 per assumption, three fields, no prose. Loaded in every AI session
 - Confidence: high — `REQUIREMENTS.md` fixes the built-in module and `DEPENDENCIES.md` shows no SQLite package installed.
 - Target when resolved: `docs/ARCHITECTURE.md` → persistence; record the concrete import in `docs/PATTERNS/` once written.
 
-### Response-event ordering mechanism is unspecified [ACTIVE]
+### Response-event ordering mechanism is unspecified [RESOLVED]
 
-- Assumption: the response-scoped monotonically increasing event `id` (FR-004) and the timestamp-independent message ordering (FR-006, AC-007) will both be satisfied by a stored integer sequence, not by autoincrement rowids shared across responses.
-- Confidence: medium — requirements fix the observable property, not the mechanism.
-- Target when resolved: `docs/ARCHITECTURE.md` → stream coordination.
+- Resolved by design, 2026-09-18: per-response `stream_events.event_id` and per-conversation `messages.seq` are integer sequences allocated as `MAX(...)+1` inside the write transaction, never autoincrement rowids shared across responses. See `plans/streaming-chat/architecture-notes.md` → Decision 1.
+
+### AC-014 "interrupted response, recoverable not silently completed" — mechanism is an interpretation [ACTIVE] [A1]
+
+- Assumption: on API startup, any non-terminal response with no persisted terminal event gets a synthetic persisted `response.failed` event (code `stream_interrupted`), retaining `partial_text`, and is recovered via the existing single-retry affordance rather than a new response state.
+- Confidence: medium — AC-014 fixes the observable behavior, not the mechanism.
+- Target when resolved: `docs/ARCHITECTURE.md` → stream coordination, once implemented and validated against AC-014.
+
+### `EventSource` cursor delivery uses a query param, not only the `Last-Event-ID` header [ACTIVE] [A2]
+
+- Assumption: since `EventSource` cannot set request headers on its initial connection, the client passes the resume cursor as `?lastEventId=N`; the browser's own `Last-Event-ID` header (present only on the browser's automatic reconnects) takes precedence when both are present. This is an addition to the FR-005 header contract, not a substitute for it — the server still honors `Last-Event-ID`.
+- Confidence: high — a structural constraint of the `EventSource` API, not a design preference.
+- Target when resolved: `docs/ARCHITECTURE.md` → stream coordination, once implemented.
 
 ### Configuration surface is undefined [ACTIVE]
 
