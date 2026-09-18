@@ -65,7 +65,7 @@ Raw transcripts, host identifiers, and private archive paths are intentionally n
 
 ## Public Result
 
-- Evidence branch: `evidence/gov-004b`
+- Evidence branch: [`evidence/gov-004b`](https://github.com/chamathsilva/rosetta-poc-chat/tree/evidence/gov-004b/evidence/GOV-004B)
 - Public artifacts: `evidence/GOV-004B/README.md` and `evidence/GOV-004B/MANIFEST.md`
 - Accepted-run branch/tag movement: none
 - Product commit or implementation: none
