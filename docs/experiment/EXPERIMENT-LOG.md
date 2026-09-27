@@ -16,7 +16,9 @@ User directed: land and checkpoint (commit + push) INC-00 alone before INC-01 st
 
 ### 2026-09-27 | manual-correction | INC-00 implemented and independently verified
 
-INC-00 (seed toolchain fixes — `plans/chat-poc/chat-poc-PLAN.md` INC-00, `plans/chat-poc/chat-poc-SPECS.md` §8.1-§8.3) implemented by an engineer subagent, all commands under pinned Node 24.21.0. Orchestrator independently re-ran a clean-tree `npm run check` (exit 0, zero product tests present) and reviewed every changed file's diff line-by-line against SPECS §8.1/§8.2/§8.3 — no deviation found. `AC-001` marked `Passed` in `docs/experiment/EVIDENCE-MAP.md` with the exact file list as evidence. Not yet committed or pushed at the time of this entry — that is the next step, done separately so this log records only what has actually happened.
+INC-00 (seed toolchain fixes — `plans/chat-poc/chat-poc-PLAN.md` INC-00, `plans/chat-poc/chat-poc-SPECS.md` §8.1-§8.3) implemented by an engineer subagent, all commands under pinned Node 24.21.0. Orchestrator independently re-ran a clean-tree `npm run check` (exit 0, zero product tests present) and reviewed every changed file's diff line-by-line against SPECS §8.1/§8.2/§8.3 — no deviation found. `AC-001` marked `Passed` in `docs/experiment/EVIDENCE-MAP.md` with the exact file list as evidence.
+
+Follow-up (same day, after this entry was first written): committed standalone as `a20c0bb` on `experiment/EXP-002` (parent `e16cb0a`, the planning checkpoint), pushed to `origin/experiment/EXP-002`, and independently verified via `git ls-remote origin refs/heads/experiment/EXP-002` — remote tip `a20c0bbedd518154fb343556e9bd9e84b056ab2c` matches local HEAD exactly. No other increment's files were included in this commit.
 
 ### 2026-09-27 | manual-correction | Five defects found by user-led review of chat-poc-SPECS.md/PLAN.md
 
