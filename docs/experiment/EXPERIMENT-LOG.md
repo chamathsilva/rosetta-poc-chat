@@ -6,6 +6,18 @@ Style: `### <YYYY-MM-DD> | <category> | <one-line summary>`, body = what happene
 
 ## Entries
 
+### 2026-09-27 | unexpected-change | Stray permission-menu input during INC-00 checkpoint review
+
+A bare `4` arrived mid-turn while the orchestrator was inspecting git status/config/remote for the INC-00 checkpoint, with no pending question from the assistant it could answer. Treated as unintentional (e.g. stray terminal/menu input) and not acted on; flagged to the user, work continued on the directed checkpoint task.
+
+### 2026-09-27 | unexpected-change | INC-01 stopped before writing any file, to honor "INC-00 must land alone"
+
+User directed: land and checkpoint (commit + push) INC-00 alone before INC-01 starts, per `plans/chat-poc/chat-poc-PLAN.md` governing rule 8. The orchestrator had already dispatched an engineer subagent for INC-01; it was still reading spec sections and had written no files under `packages/shared/src`. Stopped via `TaskStop` before any write. `git status` confirmed no `packages/shared/src` changes existed at stop time. INC-01 will be redispatched fresh after the INC-00 checkpoint is committed and pushed, and the push is verified against the remote.
+
+### 2026-09-27 | manual-correction | INC-00 implemented and independently verified
+
+INC-00 (seed toolchain fixes — `plans/chat-poc/chat-poc-PLAN.md` INC-00, `plans/chat-poc/chat-poc-SPECS.md` §8.1-§8.3) implemented by an engineer subagent, all commands under pinned Node 24.21.0. Orchestrator independently re-ran a clean-tree `npm run check` (exit 0, zero product tests present) and reviewed every changed file's diff line-by-line against SPECS §8.1/§8.2/§8.3 — no deviation found. `AC-001` marked `Passed` in `docs/experiment/EVIDENCE-MAP.md` with the exact file list as evidence. Not yet committed or pushed at the time of this entry — that is the next step, done separately so this log records only what has actually happened.
+
 ### 2026-09-27 | manual-correction | Five defects found by user-led review of chat-poc-SPECS.md/PLAN.md
 
 User reviewed `plans/chat-poc/chat-poc-SPECS.md`/`chat-poc-PLAN.md` directly (Phase 5, user-led) and identified 5 defects, all corrected before any implementation:

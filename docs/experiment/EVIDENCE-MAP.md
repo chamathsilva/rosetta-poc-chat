@@ -25,7 +25,7 @@ Status values: `Not started` | `In progress` | `Passed` | `Failed (explanation)`
 
 | ID | Spec section | Plan increment(s) | Implementation path | Test path | Status |
 |---|---|---|---|---|---|
-| AC-001 | SPECS §8.1, §8.2, §8.3 | INC-00 (re-verified at INC-14 exit) | `package.json`, `tsconfig*.json` | n/a (`npm ci && npm run check`) | Not started |
+| AC-001 | SPECS §8.1, §8.2, §8.3 | INC-00 (re-verified at INC-14 exit) | `package.json`, `apps/api/package.json`, `apps/web/package.json`, `packages/shared/package.json`, `apps/api/tsconfig.json`, `apps/web/tsconfig.json`, `packages/shared/tsconfig.json`, `tsconfig.test.json`, `vitest.config.ts`, `apps/web/test/setup.ts` | n/a (`npm ci && npm run check`, zero product tests present) | Passed — verified twice under pinned Node 24.21.0 (engineer subagent run + independent orchestrator re-run), both clean-tree, exit 0. Throwaway jsdom smoke test confirmed the `web` Vitest project runs under jsdom, then was removed. Re-verified again at INC-14 exit once product code exists. |
 | AC-002 | SPECS §9.3, §9.6 | INC-09, INC-13 | TBD | TBD | Not started |
 | AC-003 | SPECS §3.5, §6.2 | INC-04, INC-10 | TBD | TBD | Not started |
 | AC-004 | SPECS §4.1–§4.3, §4.6, §6.2 | INC-01, INC-06, INC-08 | TBD | TBD | Not started |
