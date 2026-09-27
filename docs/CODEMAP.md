@@ -90,4 +90,3 @@ Regenerate: `bash agents/TEMP/codemap.sh . 4 && mv CODEMAP.md docs/` (script is 
 #### rosetta-poc-chat-exp-002/packages/shared/src (1 files) — Primary application source code
 
 - index.ts
-
