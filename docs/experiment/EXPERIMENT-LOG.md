@@ -48,6 +48,8 @@ Fix: added `createConversationResponseSchema`, `listConversationsResponseSchema`
 
 No new module was added this time (governing rule 1 untouched) — these three land inside `conversation.ts`, which §2.1 already designated for exactly this content.
 
+Follow-up (same day): INC-01 was committed standalone as `e3900d5` (`e3900d536d0ccc292b2134f8eafc74871705deca`) on `experiment/EXP-002`, pushed to `origin/experiment/EXP-002`, and independently verified with `git ls-remote`; the remote tip matched local HEAD exactly. The worktree was clean after the push. The plan header was then corrected from its stale pre-implementation status to record INC-00/INC-01 complete and INC-02 next.
+
 ### 2026-09-27 | manual-correction | Five defects found by user-led review of chat-poc-SPECS.md/PLAN.md
 
 User reviewed `plans/chat-poc/chat-poc-SPECS.md`/`chat-poc-PLAN.md` directly (Phase 5, user-led) and identified 5 defects, all corrected before any implementation:

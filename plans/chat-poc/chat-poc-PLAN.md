@@ -1,6 +1,6 @@
 # chat-poc — Execution Plan (HOW)
 
-Status: planning checkpoint reviewed; coding-flow Phase 6 is intentionally held before overall approval. Implementation has not started. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
+Status: implementation in progress on `experiment/EXP-002`; INC-00 and INC-01 are complete and published. Next increment: INC-02. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
 15 increments: `INC-00` … `INC-14`. `INC-00`..`INC-09` are Phase 7 (implementation), `INC-10`..`INC-13` are Phase 11 (tests), `INC-14` is evidence close-out.
 
 ## Read first (every increment)
