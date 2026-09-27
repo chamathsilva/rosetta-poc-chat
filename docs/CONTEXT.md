@@ -40,7 +40,7 @@ Style: terse bullets, no technology or code detail (see `docs/ARCHITECTURE.md`).
 
 ## Target Product (not yet built)
 
-- Conversations: list (most recently updated first), create, select; selection survives page refresh.
+- Conversations: list (most recently updated first), create, select; selection survives page refresh. Summary = id, title, updatedAt; title derived from the first user message (truncated), placeholder until one exists (A-010).
 - Messages: user sends non-empty text (trimmed, max 4000 Unicode code points); assistant reply streams in progressively; ordered history.
 - Assistant: deterministic mock; same normalized input -> same reply, always.
 - Durability: conversations, messages, replies, stream progress survive page refresh and server restart.
@@ -56,7 +56,7 @@ Style: terse bullets, no technology or code detail (see `docs/ARCHITECTURE.md`).
 - Message: user or assistant; order must not depend only on timestamps.
 - Response: one assistant reply to one user message; produced as an ordered sequence of stream Events.
 - Event: started -> zero+ deltas -> exactly one terminal (completed | failed). Event numbers increase per response.
-- Retry: at most one per failed Response; yields one replacement Response; repeated retry requests return that same replacement.
+- Retry: at most one per failed Response; yields one replacement Response; repeated retry requests return that same replacement; if the replacement also fails, no further retry is offered (A-003).
 
 ## Response Lifecycle (target, implicit state machine)
 
@@ -64,7 +64,7 @@ Style: terse bullets, no technology or code detail (see `docs/ARCHITECTURE.md`).
 - streaming: started, deltas arriving.
 - completed: terminal, full reply.
 - failed: terminal, safe failure; partial text kept; retry offered once.
-- interrupted: non-terminal reply found after server restart; must show as recoverable, never as silently completed (AC-014). Exact recovery action: unknown, see `docs/ASSUMPTIONS.md`.
+- interrupted: non-terminal reply found after server restart; transitioned to `failed` (safe, redacted text) on detection and offered the standard single retry — never left/shown as silently completed (AC-014, A-002).
 - UI statuses the user must see distinctly: sending, streaming, completed, failed, reconnecting, retrying; plus distinguishable network, server, validation, and provider errors each with a next action (AC-018).
 
 ## Non-Goals
@@ -81,7 +81,7 @@ Style: terse bullets, no technology or code detail (see `docs/ARCHITECTURE.md`).
 - Seed: `chat-seed-v1`, immutable non-functional baseline.
 - FR-nnn / AC-nnn: requirement / acceptance-criterion IDs in the fixed docs.
 - Study deviation: recorded, justified departure from fixed requirements/technology.
-- Normalized message: input form the mock uses for determinism (definition open, see `docs/ASSUMPTIONS.md`).
+- Normalized message: trimmed content only (case and inner whitespace preserved); input form the mock uses for determinism (A-008).
 - Client message ID: sender-chosen idempotency key, unique within a conversation.
 - Terminal event: completed or failed; exactly one per response.
 - Replacement response: the single response created by a retry.
