@@ -61,6 +61,7 @@ packages/shared/src/
   contracts/events.ts          SSE envelope + 4 payload schemas + discriminated union
   contracts/errors.ts          ErrorEnvelope schema + ErrorCode union
   contracts/params.ts          path params, Last-Event-ID parse schema
+  contracts/health.ts          GET /health response schema (not enveloped)
   domain-rules/normalize.ts    normalizeContent (trim), codePointLength, MAX=4000
   domain-rules/title.ts        deriveConversationTitle + placeholder
   domain-rules/terminal.ts     isTerminalEventType / isTerminalStatus
@@ -280,9 +281,9 @@ All schemas are Zod 4.6.5, exported with `z.infer` types, and are the single def
 
 | Method + path | Request schema | Success | Response schema | Error codes |
 |---|---|---|---|---|
-| `POST /api/conversations` | `createConversationRequestSchema = z.object({}).strict()`; absent body treated as `{}` | `201` | `{ conversation }` | `VALIDATION_FAILED`, `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE` |
-| `GET /api/conversations` | — | `200` | `{ conversations: ConversationSummary[] }` | `INTERNAL_ERROR` |
-| `GET /api/conversations/:conversationId` | `conversationParamsSchema` | `200` | `{ conversation, messages, responses, activeResponse: Response \| null }` | `VALIDATION_FAILED`, `NOT_FOUND` |
+| `POST /api/conversations` | `createConversationRequestSchema = z.object({}).strict()`; absent body treated as `{}` | `201` | `createConversationResponseSchema = { conversation }` | `VALIDATION_FAILED`, `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE` |
+| `GET /api/conversations` | — | `200` | `listConversationsResponseSchema = { conversations: ConversationSummary[] }` | `INTERNAL_ERROR` |
+| `GET /api/conversations/:conversationId` | `conversationParamsSchema` | `200` | `getConversationResponseSchema = { conversation, messages, responses, activeResponse: Response \| null }` | `VALIDATION_FAILED`, `NOT_FOUND` |
 | `POST /api/conversations/:conversationId/messages` | `sendMessageRequestSchema = z.object({ clientMessageId, content: z.string() }).strict()` | `202` | `sendMessageAcceptedSchema = { conversationId, userMessage: Message, response: Response }` | `VALIDATION_FAILED`, `NOT_FOUND`, `IDEMPOTENCY_KEY_CONFLICT`, `RESPONSE_ALREADY_ACTIVE`, `SERVICE_UNAVAILABLE` |
 | `POST /api/responses/:responseId/retry` | `responseParamsSchema` | `202` | `retryAcceptedSchema = { conversationId, responseId, retryOfResponseId }` | `VALIDATION_FAILED`, `NOT_FOUND`, `RESPONSE_NOT_FAILED`, `RETRY_NOT_ALLOWED`, `SERVICE_UNAVAILABLE` |
 | `GET /api/responses/:responseId/events` | `responseParamsSchema` + `Last-Event-ID` header (§6.3) | `200 text/event-stream` | §6 | `VALIDATION_FAILED`, `NOT_FOUND`, `INVALID_LAST_EVENT_ID`, `LAST_EVENT_ID_OUT_OF_RANGE` |

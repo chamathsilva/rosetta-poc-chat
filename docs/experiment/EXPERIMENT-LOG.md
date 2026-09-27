@@ -20,6 +20,34 @@ INC-00 (seed toolchain fixes — `plans/chat-poc/chat-poc-PLAN.md` INC-00, `plan
 
 Follow-up (same day, after this entry was first written): committed standalone as `a20c0bb` on `experiment/EXP-002` (parent `e16cb0a`, the planning checkpoint), pushed to `origin/experiment/EXP-002`, and independently verified via `git ls-remote origin refs/heads/experiment/EXP-002` — remote tip `a20c0bbedd518154fb343556e9bd9e84b056ab2c` matches local HEAD exactly. No other increment's files were included in this commit.
 
+### 2026-09-27 | manual-correction | title.ts had an intra-layer import; SPECS §2 requires domain-rules/* to depend on nothing
+
+INC-01's first draft of `packages/shared/src/domain-rules/title.ts` imported `codePointLength` from `./normalize.ts` (both zero-IO, zero-zod) to avoid duplicating code-point-counting logic, reasoning this satisfied SPECS §2's "no zod, no IO" wording. User rejected: SPECS §2 says `domain-rules/*` "depend on nothing," full stop, and the plan's governing rules 1-2 keep the approved layout fixed and make SPECS the contract source, not to be re-decided mid-implementation — even to relax an ambiguity in the requester's favor.
+
+Fix: `title.ts` now has a private, unexported, file-local `titleCodePoints` helper (`Array.from`-based) instead of importing from `normalize.ts`. Zero imports confirmed via `grep -n "^import" packages/shared/src/domain-rules/*.ts`. Small, accepted duplication of a two-line code-point-counting expression between `normalize.ts` and `title.ts`, traded for literal compliance with a fixed spec rule rather than an orchestrator-favorable reinterpretation of it. Re-ran the full INC-01 exit check afterward — still green.
+
+### 2026-09-27 | manual-correction | INC-01 contract surface was incomplete; execution-discovered spec gap (health.ts)
+
+User-led independent review of the completed INC-01 work found the "all 7 contracts files" claim in the subagent's report (echoed into `docs/experiment/EVIDENCE-MAP.md`) was inaccurate: only 6 files existed. Audit of every schema/body explicitly named (via `xSchema = ...`) in `chat-poc-SPECS.md` §4.1-§4.3 and §4.6 against actual exports found 3 gaps:
+
+1. `createConversationRequestSchema` (§4.3, `POST /api/conversations`) — missing. Fixed: added to `contracts/conversation.ts` (§2.1 already said this file holds "create/list bodies").
+2. `retryAcceptedSchema` (§4.3, `POST /api/responses/:responseId/retry`) — missing. Fixed: added to `contracts/response.ts` (natural fit, response-retry-related).
+3. `healthResponseSchema` (§4.3, `GET /health`) — missing, and unlike the other two, no existing file in the fixed §2.1 layout (conversation/message/response/events/errors/params) fits it without stretching that file's stated scope.
+
+For (3), the orchestrator's first instinct was to place it in the existing `contracts/errors.ts` to avoid touching the fixed module layout (plan governing rule 1). The user explicitly overrode this and gave direct orchestrator approval to add a 7th module instead — judged the cleaner root-cause fix, and the one that reconciles the SPECS TLDR's pre-existing "7 files" line (which was correct all along; the §2.1 layout *tree* was the buggy, incomplete part, missing a `contracts/health.ts` row).
+
+Resolution: created `packages/shared/src/contracts/health.ts` (`healthResponseSchema`), barrel-exported it, updated `chat-poc-SPECS.md` §2.1's layout tree to list `contracts/health.ts`, and updated `chat-poc-PLAN.md` INC-01's file list to include it and name all three previously-missing schemas explicitly. Full INC-01 exit check re-run after all three additions — still green (see below).
+
+This is an execution-discovered specification correction (the fixed §2.1 layout was itself incomplete, not something INC-01 mis-implemented against a correct spec), authorized by the orchestrator per the user's explicit direction, not a unilateral spec change.
+
+### 2026-09-27 | manual-correction | Three §4.3 response bodies were left unnamed; found missing on a further independent pass
+
+A second independent review pass (user-led) found the orchestrator had stopped short: `chat-poc-SPECS.md` §4.3 gives 5 request/response bodies an explicit `xSchema = ...` name in its table, but leaves 3 response shapes inline/unnamed — `POST /api/conversations` success (`{ conversation }`), `GET /api/conversations` success (`{ conversations: ConversationSummary[] }`), `GET /api/conversations/:conversationId` success (`{ conversation, messages, responses, activeResponse }`). The orchestrator's earlier reasoning — that "unnamed in the table" meant "not required as a shared schema" — was wrong: SPECS §2.1 already said `conversation.ts` owns "create/list bodies" (response bodies, not just the one named request body), and AC-004/the §4 preamble ("Response bodies are parsed on the client as well as produced on the server") require a single shared definition for every body, not only the 5 the table happened to name.
+
+Fix: added `createConversationResponseSchema`, `listConversationsResponseSchema`, `getConversationResponseSchema` to `packages/shared/src/contracts/conversation.ts` (shapes exactly as SPECS §4.3 states; export names are an implementation choice, flagged in the file's own header comment for review since the spec text never assigned them names). `getConversationResponseSchema` required `conversation.ts` to import `messageSchema`/`responseSchema` — checked for import cycles first (`message.ts`/`response.ts` do not import `conversation.ts`; the dependency graph stays a DAG). Updated `chat-poc-SPECS.md` §4.3's table to show the three new names instead of bare inline shapes, so INC-06/INC-08 have an unambiguous name to import. Full INC-01 exit check re-run after this addition — still green.
+
+No new module was added this time (governing rule 1 untouched) — these three land inside `conversation.ts`, which §2.1 already designated for exactly this content.
+
 ### 2026-09-27 | manual-correction | Five defects found by user-led review of chat-poc-SPECS.md/PLAN.md
 
 User reviewed `plans/chat-poc/chat-poc-SPECS.md`/`chat-poc-PLAN.md` directly (Phase 5, user-led) and identified 5 defects, all corrected before any implementation:

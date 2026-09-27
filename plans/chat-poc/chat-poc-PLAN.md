@@ -42,9 +42,9 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 
 ### INC-01 — Shared contracts + domain rules
 
-- Files: `packages/shared/src/` → `index.ts` (barrel), `ids.ts`, `contracts/{conversation,message,response,events,errors,params}.ts`, `domain-rules/{normalize,title,terminal}.ts`.
-- Spec: §3.1, §3.3, §4.1, §4.2, §4.3 (schemas only), §4.6, §6.2, §6.3.
-- Covers: FR-010, AC-004, AC-012 (parser), AC-019 (limits), A-008/A-010 finalized values.
+- Files: `packages/shared/src/` → `index.ts` (barrel), `ids.ts`, `contracts/{conversation,message,response,events,errors,params,health}.ts`, `domain-rules/{normalize,title,terminal}.ts`.
+- Spec: §2.1, §3.1, §3.3, §4.1, §4.2, §4.3 (schemas only — all 5 explicitly named request/response bodies plus the 3 inline/unnamed response bodies conversation.ts must also cover per §2.1 "create/list bodies": create response, list response, get-detail response), §4.6, §6.2, §6.3.
+- Covers: FR-010, AC-004, AC-012 (parser), AC-019 (limits), A-008/A-010 finalized values, `contracts/health.ts` (execution-discovered specification correction, 2026-09-27 — see EXPERIMENT-LOG), `createConversationResponseSchema`/`listConversationsResponseSchema`/`getConversationResponseSchema` (named wrappers for §4.3's unnamed inline response shapes, 2026-09-27 — see EXPERIMENT-LOG).
 - Exit: `npm run typecheck`; `node -e "import('@rosetta-poc/chat-shared').then(m=>console.log(Object.keys(m).length))"` after `npm run build -w @rosetta-poc/chat-shared` prints a non-zero count.
 - Trap: `packages/shared` stays TSX-free and zod-only — no Node built-ins, no DOM types, so both api and web can consume it.
 
