@@ -523,6 +523,7 @@ Leading zeros are accepted and parsed decimally (`"007"` ⇒ 7). Both 400s are e
 ### 6.4 Replay/live handoff — `stream/subscribe.ts` (FR-005, AC-011)
 
 `STREAM-INV-1` from §2.2 is the contract: subscribe-with-buffer → synchronous `listAfter` → write frames tracking `maxSent` → flush buffer dropping `seq ≤ maxSent` → end if terminal and drained, with **no `await` between the five steps**. Observable guarantees to assert: frames arrive in strictly increasing `seq`, no `seq` appears twice, the concatenation of delta texts contains no repeated segment, the stream ends after the terminal frame, and a request for response A never yields a frame whose `data.responseId !== A` (the query is keyed by `response_id`, so cross-response leakage is impossible by query shape — FR-005).
+If synchronous backfill or sink delivery throws after the buffering subscription is installed, `attachResponseStream` must unsubscribe before rethrowing. A failed attachment must never leave a live subscriber behind (execution-discovered cleanup requirement, 2026-09-28).
 Client abort (`request.raw.on("close")`) unsubscribes from the hub and clears the heartbeat timer; it never mutates response state.
 
 ### 6.5 Web SSE client — `apps/web/src/api/sse-client.ts` (FR-005, FR-007, R3)

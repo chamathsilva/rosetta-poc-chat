@@ -72,6 +72,7 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 - Covers: FR-003, FR-004, FR-005 (replay), FR-008 (failure path), AC-003, AC-010, AC-011, AC-014, AC-016, A-002.
 - Exit: `npm run typecheck`; a throwaway script drives `runner` against a temp DB with `fakeClock`+`sequentialIds` and prints the `stream_events` rows — asserts seq 1..n, one `response.started`, one terminal, and that two runs over the same normalized content produce identical `data` strings.
 - Trap: `subscribe.ts` steps 1–5 must sit in one synchronous block. Inserting an `await`, a `queueMicrotask`, or a `Promise.resolve().then` between them reintroduces the replay/live gap the design eliminates.
+- Correction discovered during execution: once the buffering subscription is installed, a synchronous backfill/read or sink/write failure must unsubscribe before it is rethrown. Independent review found and fixed the otherwise-leaked subscriber; INC-12 carries the regression test.
 
 ### INC-05 — Use cases
 
@@ -131,7 +132,7 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 
 - Files: `apps/api/src/stream/{hub,runner,subscribe}.test.ts`, `apps/api/src/http/routes/response-events.test.ts`, `apps/api/src/http/sse.test.ts`.
 - Spec: §6.1, §6.2, §6.3, §6.4.
-- Named tests: "seq 1..n, one start, one terminal, nothing after terminal" (AC-010); "reconnect at mid-stream replays only later events, concatenated deltas contain no repeat, then continues live" (AC-011); "reconnect on a terminal response replays then closes"; "`Last-Event-ID === maxSeq` on a terminal response closes with zero frames"; the five §6.3 rows over the real route (AC-012); "a stream for response A never yields a frame for response B" (FR-005); "heartbeat frames carry no `id:`" (AC-003/AC-010).
+- Named tests: "seq 1..n, one start, one terminal, nothing after terminal" (AC-010); "reconnect at mid-stream replays only later events, concatenated deltas contain no repeat, then continues live" (AC-011); "reconnect on a terminal response replays then closes"; "`Last-Event-ID === maxSeq` on a terminal response closes with zero frames"; "synchronous backfill/read or sink/write failure detaches the buffering subscriber before rethrow"; the five §6.3 rows over the real route (AC-012); "a stream for response A never yields a frame for response B" (FR-005); "heartbeat frames carry no `id:`" (AC-003/AC-010).
 - Exit: `npm test` green.
 
 ### INC-13 — Tests: React component
