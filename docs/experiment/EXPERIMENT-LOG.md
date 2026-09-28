@@ -171,6 +171,16 @@ The exit probe also exposed a contract gap: retrying one failed response while a
 
 Independent review inspected all five source files, re-ran full `npm run check` under Node 24.21.0, and ran an 18-assertion real-SQLite smoke covering create/list/get, normalized send, full-object duplicate replay, conflict, new-send active gate, new-retry active gate, retry replay, row counts, post-commit run start, and read-model retry linkage. All passed. `MessageRepo` still lacks `findById`, so duplicate and retry paths re-read conversation history; this is recorded friction rather than widened scope. The implementation checkpoint was committed as `679f52247792a572087301fff063caaaeef404a5`, pushed, and the remote ref was independently verified to match.
 
+### 2026-09-28 | manual-correction | INC-06 supplied the missing fixed validation-message map and exposed an INC-07 startup-log requirement
+
+Claude Code implemented the HTTP/SSE transport and stopped before committing. The guided live-server run passed the endpoint status matrix, all five `Last-Event-ID` cases, exact SSE replay, malformed-body redaction, configured/foreign-origin CORS, active-response/retry paths, client-disconnect detach followed by terminal replay, draining behavior, and the structured log allowlist. Three corrections during that run belonged only to the temporary harness — quoting a zsh bracket glob, replacing GNU-only `cat -A` on macOS, and attaching the disconnect observer before abort — and did not require product changes.
+
+The transport needed the fixed Zod `issue.code` to public-message map already required by SPECS §4.6, but INC-01 had not created it. It was added to `packages/shared/src/contracts/errors.ts` during INC-06 and consumed by `http/error-envelope.ts`; received values are not echoed. This is recorded as a missed earlier contract item, not an invented transport behavior.
+
+Independent review inspected all ten changed files, re-ran the full `npm run check` under Node 24.21.0, and passed a separate 27-group probe over health/draining, strict/invalid JSON, strict unknown fields, invalid identifiers, unknown routes, configured/foreign-origin CORS, malformed/out-of-range event IDs, unknown-error redaction, log-field filtering, and exact SSE formatting. Implementation checkpoint `3d84946fc3e2ec58b2add574667245d6c1441097` was pushed and the remote ref matched exactly.
+
+Review also found a forward wiring risk: Fastify's framework-generated successful-listen message includes the bound URL in the free-text message. The structured-field formatter cannot remove text already embedded in `msg`, so INC-07 must suppress that message and emit only the explicit allowlisted recovery record. SPECS §7.4 and the INC-07 exit/trap text now make that requirement durable. The existing `DATABASE_UNAVAILABLE` mapping remains compatible with the contract: `/health` intentionally catches database-check failure and returns its non-enveloped health schema per §4.3; no claim is made that a health failure returns an error envelope.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)

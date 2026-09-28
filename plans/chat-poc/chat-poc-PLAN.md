@@ -1,6 +1,6 @@
 # chat-poc — Execution Plan (HOW)
 
-Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-05 are complete and published. Next increment: INC-06. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
+Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-06 are complete and published. Next increment: INC-07. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
 15 increments: `INC-00` … `INC-14`. `INC-00`..`INC-09` are Phase 7 (implementation), `INC-10`..`INC-13` are Phase 11 (tests), `INC-14` is evidence close-out.
 
 ## Read first (every increment)
@@ -90,14 +90,15 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 - Covers: FR-002, FR-004 (framing), FR-005 (header handling), FR-010 (CORS, boundary validation), AC-004, AC-012, AC-021, AC-023.
 - Exit: `npm run typecheck`; `curl -i` against a locally started server returns the exact status codes of SPECS §4.3 for: create, list, get, send, retry-of-completed, unknown id, non-UUID id; `curl -N -H 'Last-Event-ID: 0'` on a completed response prints the full frame sequence in SPECS §6.1 format.
 - Trap: both `Last-Event-ID` 400s are written as a normal JSON envelope **before** any SSE header. Emitting SSE headers first makes the error invisible to the client.
+- Corrections/findings discovered during execution: the fixed Zod `issue.code` message map required by SPECS §4.6 was absent from INC-01's shared error contract and was added during INC-06; the route layer now consumes it without echoing received values. The guided live-server probe required three harness-only corrections (zsh bracket globbing, BSD `cat` flags, and attaching the disconnect observer before abort); none changed product code. Independent verification then passed the full gate plus a separate 27-group HTTP/CORS/SSE/redaction probe. Fastify's default startup message can still embed the configured host/port in the free-text `msg`, so INC-07 must suppress it rather than relying on the structured-field formatter.
 
 ### INC-07 — Bootstrap, shutdown, entrypoint, test helpers
 
 - Files: `apps/api/src/bootstrap/{container,shutdown}.ts`, `apps/api/src/index.ts`, `apps/api/src/testing/{temp-db,fake-clock,sequential-ids}.ts`.
 - Spec: §2 (composition root), §5.6 (recovery before `listen`, both zero-event and partial-stream branches), §7.5 (registry + bounded-drain shutdown), §10 (helper contracts).
 - Covers: FR-011, AC-014 (wiring), AC-021 (log allowlist in practice), AC-005 (re-open same file), bounded-drain shutdown (user-directed correction 2026-09-27; automated test lands in INC-11).
-- Exit: `npm run dev:api` starts, logs `recoveredResponses`, serves `/health` `200`; `SIGINT` closes within 5 s with exit code 0 and no `ERR_SQLITE_*` on stderr; restarting against the same `CHAT_DB_PATH` preserves prior data and reports a non-zero `recoveredResponses` when a response was left active (manual smoke only — the automated shutdown-drain assertion is INC-11's `bootstrap/shutdown.test.ts`).
-- Trap: `createContainer(config, overrides?)` is the only injection seam — no env var may select a provider (SPECS §7.1). The runner registry must store `{controller, promise}` pairs, not bare controllers — awaiting only the abort call without awaiting the runner's settle promise is exactly the bug SPECS §7.5 step 4 exists to prevent.
+- Exit: `npm run dev:api` starts, emits an allowlisted `recoveredResponses` record without a framework-generated `Server listening at ...`/host/port message, and serves `/health` `200`; `SIGINT` closes within 5 s with exit code 0 and no `ERR_SQLITE_*` on stderr; restarting against the same `CHAT_DB_PATH` preserves prior data and reports a non-zero `recoveredResponses` when a response was left active (manual smoke only — the automated shutdown-drain assertion is INC-11's `bootstrap/shutdown.test.ts`).
+- Trap: `createContainer(config, overrides?)` is the only injection seam — no env var may select a provider (SPECS §7.1). The runner registry must store `{controller, promise}` pairs, not bare controllers — awaiting only the abort call without awaiting the runner's settle promise is exactly the bug SPECS §7.5 step 4 exists to prevent. Do not call Fastify `listen` with its default successful-listen logging enabled: the text message includes configured host/port and bypasses structured-field filtering, violating the exhaustive §7.4 allowlist.
 
 ### INC-08 — Web foundation: config, API client, SSE client, reducer
 

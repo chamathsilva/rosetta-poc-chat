@@ -62,3 +62,11 @@ For detailed change history, use git history and PRs instead of expanding this f
 - Execution review extended the one-active-response gate to genuinely new retry replacements. Repeated retry replay still returns its existing active replacement; a different active response now produces `RESPONSE_ALREADY_ACTIVE` instead of leaking a raw SQLite unique-index error.
 - Validated under pinned Node 24.21.0 with full `npm run check`, Claude Code's 15-case exit smoke, static boundary checks, and an independent 18-assertion SQLite smoke.
 - Published implementation checkpoint: `679f522` (`679f52247792a572087301fff063caaaeef404a5`).
+
+### INC-06 — HTTP/SSE transport: complete, 2026-09-28
+
+- Added Fastify route composition, strict shared-contract parsing, fixed/redacted error envelopes, exact-origin CORS, draining gates, exhaustive structured-log filtering, exact SSE framing/heartbeat, and pre-header `Last-Event-ID` validation.
+- Added the fixed Zod issue-code message map required by SPECS §4.6 after INC-06 exposed its omission from the INC-01 contract surface.
+- Guided live-server verification covered route codes, all five `Last-Event-ID` cases, full replay frames, disconnect/detach/replay, malformed bodies, CORS, active-response/retry behavior, draining, and log-field absence. Independent verification passed the full pinned-Node gate and a separate 27-group HTTP/CORS/SSE/redaction probe.
+- Carried one concrete INC-07 requirement forward: suppress Fastify's successful-listen message because its free-text URL contains environment-derived host/port outside the exhaustive log allowlist.
+- Published implementation checkpoint: `3d84946` (`3d84946fc3e2ec58b2add574667245d6c1441097`).
