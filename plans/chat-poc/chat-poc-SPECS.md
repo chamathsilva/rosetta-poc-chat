@@ -1,6 +1,6 @@
 # chat-poc — Tech Specs (WHAT)
 
-Status: specification checkpoint reviewed and implementation in progress; INC-00 through INC-02 are complete. This file remains the target-state contract. No process or step order — that is `plans/chat-poc/chat-poc-PLAN.md`.
+Status: specification checkpoint reviewed and implementation in progress; INC-00 through INC-03 are complete. This file remains the target-state contract. No process or step order — that is `plans/chat-poc/chat-poc-PLAN.md`.
 Authority: `docs/REQUIREMENTS.md` (FR-001..FR-011) + `docs/ACCEPTANCE-CRITERIA.md` (AC-001..AC-026) are fixed and read-only. Approved design: Option A Lean Hexagonal + 2 adoptions from Option C, carried into the self-contained §2 below. Living context: `docs/CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/ASSUMPTIONS.md`.
 Every contract element below carries the FR-*/AC-* IDs it satisfies. FR/AC prose is never restated — only the resulting contract.
 
@@ -125,7 +125,7 @@ Tests colocated as `*.test.ts(x)` next to each source file.
 
 Component design continued below adds only the contracts for this fixed layout.
 
-Dependency rule (FR quality requirement "separate … concerns"): `shared` depends on `zod` only; `domain/*` and `domain-rules/*` depend on nothing (no zod, no IO); `persistence/*`, `provider/*` depend on `ports.ts` types only; `usecases/*` depend on ports + domain; `http/*` depends on usecases + shared; `bootstrap/container.ts` is the only module that constructs adapters. `apps/web` never imports `apps/api`.
+Dependency rule (FR quality requirement "separate … concerns"): `shared` depends on `zod` only; `domain/*` and `domain-rules/*` depend on nothing at runtime except shared pure rules/contracts (no IO); `persistence/*` implements `ports.ts` and may depend inward on pure domain guards/errors/types plus shared schemas and `zod` for the row re-validation required by §5.4; `provider/*` depends on `ports.ts` types only; `usecases/*` depend on ports + domain; `http/*` depends on usecases + shared; `bootstrap/container.ts` is the only module that constructs adapters. `apps/web` never imports `apps/api`.
 
 Ports (`apps/api/src/ports.ts`), signatures only — no `any` anywhere in product code (FR quality requirement):
 

@@ -1,6 +1,6 @@
 # chat-poc — Execution Plan (HOW)
 
-Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-02 are complete and published. Next increment: INC-03. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
+Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-03 are complete. Next increment: INC-04. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
 15 increments: `INC-00` … `INC-14`. `INC-00`..`INC-09` are Phase 7 (implementation), `INC-10`..`INC-13` are Phase 11 (tests), `INC-14` is evidence close-out.
 
 ## Read first (every increment)
@@ -63,6 +63,7 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 - Covers: FR-006, FR-010 (row re-validation), AC-005, AC-007, AC-010 (terminal index), AC-008/AC-009 (idempotency index), AC-017 (retry index).
 - Exit: `npm run typecheck`; a throwaway script opens a temp DB, applies the schema twice (idempotence), inserts two conversations with an identical `Clock` value and asserts `listSummaries()` order is stable, then asserts the second insert of a duplicate `(conversation_id, client_message_id)` and of a second terminal event both throw. Script is deleted afterwards.
 - Trap: no `await` anywhere inside `UnitOfWork.run` — that absence is what makes SPECS §5.5 atomicity and §6.4 `STREAM-INV-1` hold. `lastInsertRowid` is never read (SPECS §5.1).
+- Corrections discovered during execution: the §2.2 dependency rule now explicitly permits the persistence adapter to import pure domain guards/errors/types and shared/Zod row schemas, because §5.3–§5.4 require those imports. This resolves an internal specification contradiction without widening the adapter outward toward IO or transport code.
 
 ### INC-04 — Provider + stream coordination
 
