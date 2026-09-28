@@ -73,7 +73,7 @@ apps/api/src/
   domain/errors.ts             DomainError subclasses carrying stable codes
   domain/response-machine.ts   PURE allowed transitions, next-seq rule, terminal-once rule
   domain/idempotency.ts        PURE classify(existing, incoming) -> Same | Conflict | New
-  domain/retry.ts              PURE canRetry() -> Ok | NotFailed | AlreadyRetried | IsReplacement
+  domain/retry.ts              PURE classifyRetry() -> start | existing | rejected
   ports.ts                     Clock, IdGenerator, Provider, UnitOfWork, 4 repo interfaces
   persistence/db.ts            DatabaseSync open + pragmas + close
   persistence/schema.ts        deterministic DDL, indexes, partial unique terminal index
@@ -168,14 +168,15 @@ export function isTerminalEventType(t: StreamEventType): boolean; // shared/doma
 export function nextSeq(maxSeq: number): number;               // maxSeq + 1, first = 1
 export type TransitionCheck = "ok" | "illegal-transition" | "already-terminal";
 export function checkTransition(from: ResponseStatus, to: ResponseStatus): TransitionCheck;
-export type AppendCheck = "ok" | "must-start-first" | "terminal-exists" | "not-streaming";
+export type AppendCheck =
+  | "ok" | "must-start-first" | "already-started" | "terminal-exists" | "not-streaming";
 export function checkAppend(
   status: ResponseStatus, existingTypes: readonly StreamEventType[], next: StreamEventType
 ): AppendCheck;
 ```
 
 - Legal transitions, exhaustively: `pending→streaming`, `pending→failed`, `streaming→completed`, `streaming→failed`. Everything else ⇒ `illegal-transition`; any `from` that is terminal ⇒ `already-terminal` (AC-010, AC-014).
-- `checkAppend` rules (AC-010): seq 1 must be `response.started`; `response.delta` requires `status === "streaming"`; a terminal type is rejected when a terminal type already exists.
+- `checkAppend` rules (AC-010): seq 1 must be `response.started`; a second `response.started` is rejected as `already-started`; `response.delta` requires `status === "streaming"`; a terminal type is rejected when a terminal type already exists.
 - `isTerminalEventType` lives in `packages/shared/src/domain-rules/terminal.ts` and is re-exported for web use; the api module re-exports it rather than duplicating (adoption #2 from Option C).
 
 ### 3.3 Title derivation — `packages/shared/src/domain-rules/title.ts` (FR-001, FR-002, A-010, R8)

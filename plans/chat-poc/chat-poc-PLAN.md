@@ -53,7 +53,8 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 - Files: `apps/api/src/config/env.ts`, `domain/{types,errors,response-machine,idempotency,retry}.ts`, `ports.ts`.
 - Spec: §2 (ports), §3.2, §3.4, §7.1.
 - Covers: FR-009, FR-010 (env), AC-008, AC-009, AC-010 (transition/append rules), A-007 finalized values, A-003, §3.4a one-active-response gate (user-directed correction 2026-09-27).
-- Exit: `npm run typecheck`. `domain/*` files contain no `import` of zod, `node:*`, or any sibling layer — verified by grep.
+- Exit: under the pinned Node version, `npm run typecheck`; a pure-domain smoke covers all 16 response-status transition pairs, first/duplicate-start and terminal append guards, idempotency, retry, and the active-response gate. `domain/*` files contain no `import` of zod, `node:*`, or any sibling layer — verified by grep.
+- Corrections discovered during execution: keep Node ambient types in `apps/api/tsconfig.json` rather than a file-local triple-slash directive; reject a duplicate `response.started` explicitly so the guard matches §6.2's exactly-one-start invariant. Both are part of the INC-02 checkpoint even though the tsconfig line corrects INC-00 ownership.
 
 ### INC-03 — Persistence
 
