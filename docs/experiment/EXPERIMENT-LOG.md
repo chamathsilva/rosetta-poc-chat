@@ -181,6 +181,18 @@ Independent review inspected all ten changed files, re-ran the full `npm run che
 
 Review also found a forward wiring risk: Fastify's framework-generated successful-listen message includes the bound URL in the free-text message. The structured-field formatter cannot remove text already embedded in `msg`, so INC-07 must suppress that message and emit only the explicit allowlisted recovery record. SPECS §7.4 and the INC-07 exit/trap text now make that requirement durable. The existing `DATABASE_UNAVAILABLE` mapping remains compatible with the contract: `/health` intentionally catches database-check failure and returns its non-enveloped health schema per §4.3; no claim is made that a health failure returns an error envelope.
 
+### 2026-09-28 | execution-context | Claude and Git identities intentionally remain separate
+
+The active native Claude Code session is authenticated through a separate Claude Pro account, while Git commits, GitHub authentication, repository ownership and pushes remain under Chamath. The evaluator explicitly directed that both configurations remain unchanged. At the time this was verified, native `/status` reported Claude Code `2.1.283`, model `claude-opus-5-5`, and medium effort; the earlier planning-run metadata above remains separately accurate for that earlier observation. This separation is recorded as execution context only: it does not imply a Rosetta association, does not change code authorship, and is not used as a product or productivity claim. The Claude account holder and exact account identifiers remain in the private native session evidence rather than being duplicated in the public repository.
+
+### 2026-09-28 | plan-refinement | INC-07 direct-bind shutdown dependency and temp-helper contract
+
+The INC-07 reviewer raised a potential shutdown risk because suppressing Fastify's successful-listen URL requires preparing Fastify and binding `app.server` directly. A bounded live probe held an idle keep-alive connection open, delivered `SIGINT`, and observed clean exit code 0 in 51 ms under pinned Node 24.21.0. The concern did not reproduce because Node 19+ `server.close()` closes idle connections. The direct bind is retained, but SPECS §7.4/§7.5 and PLAN INC-07/INC-11 now make the Node/Fastify version dependency and automated keep-alive regression explicit.
+
+The same review found that `temp-db.ts` legitimately uses `node:os.tmpdir()` as the root passed to `node:fs.mkdtempSync`, while SPECS §12's exhaustive built-in list omitted `node:os`. SPECS §10/§12 now allow that built-in for the test-helper temp root only. This is a specification omission corrected before publication, not a new dependency or an implementation deviation.
+
+Claude Code's guided checks also passed normal startup/health, same-file restart with both recovery branches, bounded drain, second-signal behavior, helper contracts, the exhaustive startup-log check, and the full repository gate. Independent review inspected all six implementation files, re-ran `npm run check` under Node 24.21.0, and ran a separate 12-assertion probe covering composition, recovery count, health, clock advancement, sequential UUIDs, invalid prefixes, drain state, database closure and temp cleanup. All passed. Implementation checkpoint `4aa99d7c9e21cf99f185799763288cac8584e8ee` was pushed and the remote ref was independently verified to match.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)

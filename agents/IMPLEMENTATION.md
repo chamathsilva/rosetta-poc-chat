@@ -70,3 +70,11 @@ For detailed change history, use git history and PRs instead of expanding this f
 - Guided live-server verification covered route codes, all five `Last-Event-ID` cases, full replay frames, disconnect/detach/replay, malformed bodies, CORS, active-response/retry behavior, draining, and log-field absence. Independent verification passed the full pinned-Node gate and a separate 27-group HTTP/CORS/SSE/redaction probe.
 - Carried one concrete INC-07 requirement forward: suppress Fastify's successful-listen message because its free-text URL contains environment-derived host/port outside the exhaustive log allowlist.
 - Published implementation checkpoint: `3d84946` (`3d84946fc3e2ec58b2add574667245d6c1441097`).
+
+### INC-07 — bootstrap, shutdown, entrypoint and test helpers: complete, 2026-09-28
+
+- Added the composition root, before-listen active-response recovery, in-flight `{controller, promise}` registry, bounded graceful shutdown, signal handling, log-safe API entrypoint, and deterministic clock/ID/temp-DB helpers.
+- Suppressed Fastify's successful-listen URL by preparing Fastify and binding `app.server` directly. Documented the resulting Node/Fastify version dependency and carried an idle-keep-alive shutdown regression into INC-11.
+- Guided verification passed startup, health, process restart, both recovery branches, bounded drain, second-signal exit, idle keep-alive closure, helper contracts and startup-log allowlisting. Independent review passed the full Node 24.21.0 gate and a separate 12-assertion composition/health/helper/shutdown probe.
+- Corrected SPECS §10/§12 to allow `node:os.tmpdir()` for the temp-DB helper; no package dependency was added.
+- Published implementation checkpoint: `4aa99d7` (`4aa99d7c9e21cf99f185799763288cac8584e8ee`).

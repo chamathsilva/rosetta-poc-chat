@@ -575,7 +575,9 @@ No other env var may alter behaviour — in particular there is no provider-sele
 
 Fastify logger at `config.logLevel` with custom `req`/`res` serializers replacing the defaults. Field allowlist, exhaustive: `requestId`, `method`, `routePath` (the registered pattern, not the concrete URL), `statusCode`, `durationMs`, `conversationId`, `responseId`, `messageId`, `contentLength`, `eventSeq`, `eventType`, `errorCode`, `recoveredResponses`. Message content, provider text, SQL, stack traces, headers and env values are never logged, not even truncated (A-006). Unit test asserts that a log line produced for a send with a distinctive content string contains neither the string nor any substring of it longer than 3 characters.
 
-The bootstrap/entrypoint suppresses Fastify's framework-generated successful-listen message (`Server listening at ...`). Filtering its structured object is insufficient because the free-text message itself contains the configured host/port, which are environment-derived values outside the exhaustive allowlist. Bootstrap instead writes only the explicit allowlisted recovery record before/after listen as appropriate. This is an execution-discovered clarification from INC-06 (2026-09-28) and is verified by the INC-07 manual startup smoke plus INC-10 logging coverage.
+The bootstrap/entrypoint suppresses Fastify's framework-generated successful-listen message (`Server listening at ...`). Filtering its structured object is insufficient because the free-text message itself contains the configured host/port, which are environment-derived values outside the exhaustive allowlist. Bootstrap therefore prepares Fastify with `ready()`, binds the underlying `app.server` directly, and writes only the explicit allowlisted recovery record. This is an execution-discovered clarification from INC-06 (2026-09-28) and is verified by the INC-07 manual startup smoke plus INC-10 logging coverage.
+
+That direct bind leaves Fastify's internal successful-listen state unset, so shutdown relies on `fastify.close()` delegating to the underlying `server.close()` rather than on Fastify's listen-state-specific force-close step. Node 19+ `server.close()` closes idle keep-alive connections; the behavior was directly verified under the pinned Node `24.21.0`. This is an accepted, version-dependent trade-off: any Node or Fastify version change must re-run the idle-keep-alive shutdown regression in §7.5 and re-evaluate the bind strategy.
 
 ### 7.5 Shutdown — `bootstrap/shutdown.ts` (FR-011)
 
@@ -592,7 +594,7 @@ On `SIGINT` or `SIGTERM`, in order:
 
 `SHUTDOWN_TIMEOUT_MS = 5000` bounds step 4 specifically (not only an overall watchdog) — closing the DB before an aborted runner's write has settled risks a corrupt or half-applied write, which this ordering prevents except when a runner exceeds the timeout, in which case shutdown proceeds anyway rather than hanging. A second signal exits `1` immediately.
 
-Requires dedicated automated coverage (INC-11, `bootstrap/shutdown.test.ts`): a `SIGINT`/direct `shutdown()` call issued while a fake, slow-but-not-hung provider run is in flight aborts it, awaits its settle inside the timeout, then closes the DB cleanly — asserting no `ERR_SQLITE_*`/unhandled-rejection and that the aborted response ends up `failed` (via the runner's own abort-handling path, not left `streaming`).
+Requires dedicated automated coverage (INC-11, `bootstrap/shutdown.test.ts`): (1) a `SIGINT`/direct `shutdown()` call issued while a fake, slow-but-not-hung provider run is in flight aborts it, awaits its settle inside the timeout, then closes the DB cleanly — asserting no `ERR_SQLITE_*`/unhandled-rejection and that the aborted response ends up `failed` (via the runner's own abort-handling path, not left `streaming`); and (2) shutdown while an idle HTTP keep-alive connection is open closes that connection and exits inside the bound with code 0 under pinned Node `24.21.0`.
 
 ---
 
@@ -746,7 +748,7 @@ Escaping (FR-010, AC-020): all user and provider text is rendered as JSX text ch
 
 ## 10. Testing contracts (AC-024)
 
-Layer inventory is fixed by §2 and the test contracts below. Cross-cutting rules: every integration test constructs a fresh temp DB path (`node:fs.mkdtempSync`) or `:memory:`; every test that asserts stable output injects `fakeClock(startIso)` and `sequentialIds(prefix)` through `createContainer(config, overrides)`; no test reads `process.env` other than through a per-test config object; no network access anywhere.
+Layer inventory is fixed by §2 and the test contracts below. Cross-cutting rules: every integration test constructs a fresh temp DB path with `node:fs.mkdtempSync(join(node:os.tmpdir(), prefix))` or uses `:memory:`; `node:os` is allowed only to obtain that operating-system temp root; every test that asserts stable output injects `fakeClock(startIso)` and `sequentialIds(prefix)` through `createContainer(config, overrides)`; no test reads `process.env` other than through a per-test config object; no external network access anywhere (loopback-only HTTP used by the shutdown regression is allowed).
 
 Required test data, by category:
 
@@ -779,7 +781,7 @@ Accepted, documented limitation (R7): the in-process `StreamHub` means two API p
 
 ## 12. Dependencies
 
-No new runtime or dev dependency. Everything is already in the seed manifests: `fastify@5.12.4`, `@fastify/cors@11.3.0`, `zod@4.6.5` (api + web + shared), `react@19.3.0`/`react-dom@19.3.0`, `vite@8.3.0`, `@vitejs/plugin-react@6.1.1`, `typescript@7.0.2`, `vitest@5.0.0`, `@testing-library/react@16.3.3`, `@testing-library/user-event@14.6.7`, `jsdom@30.0.1`, `@types/node@24.13.4`. Node built-ins used: `node:sqlite`, `node:crypto`, `node:fs`, `node:path`, `node:process`, `node:stream/web` and `node:util` (test setup only). Any addition beyond this list is a recorded study deviation.
+No new runtime or dev dependency. Everything is already in the seed manifests: `fastify@5.12.4`, `@fastify/cors@11.3.0`, `zod@4.6.5` (api + web + shared), `react@19.3.0`/`react-dom@19.3.0`, `vite@8.3.0`, `@vitejs/plugin-react@6.1.1`, `typescript@7.0.2`, `vitest@5.0.0`, `@testing-library/react@16.3.3`, `@testing-library/user-event@14.6.7`, `jsdom@30.0.1`, `@types/node@24.13.4`. Node built-ins used: `node:sqlite`, `node:crypto`, `node:fs`, `node:os` (test-helper temp root only), `node:path`, `node:process`, `node:stream/web` and `node:util` (test setup only). Any addition beyond this list is a recorded study deviation.
 
 ---
 
