@@ -159,6 +159,18 @@ Independent review then inspected all seven source files and re-ran the full che
 
 The implementation checkpoint was committed as `2b8e3b4fffd5b28358889f0fe6da36c56d663f8b`, pushed to `origin/experiment/EXP-002`, and the remote ref was independently verified before this evidence follow-up. Two bounded implementation frictions remain documented without widening INC-04: `MessageRepo` has no `findById`, so completion re-reads the conversation to obtain the inserted assistant row; the provider port has no abort signal, so the runner races pending `next()` calls against abort and requests iterator return without awaiting it. Both are acceptable under the current deterministic/local provider boundary and will be re-evaluated during INC-07 shutdown wiring and INC-11 tests.
 
+### 2026-09-28 | unexpected-change | INC-05 instruction paste was clipped a second time
+
+The resumed native Claude Code session again received only the tail of a long scoped instruction paste. Claude recognized the clipping, recovered the task from the committed plan/spec, and stated the correct INC-05 boundary before writing. No work was accepted solely from the clipped prompt. This recurrence strengthens the workflow finding from INC-04: long interactive instruction pastes are not a dependable task-transfer channel; committed artifacts plus a short increment identifier are the safer recovery path. This is an interaction observation, not attributed to Rosetta and not converted into a productivity claim.
+
+### 2026-09-28 | manual-correction | INC-05 review extended the active-response gate to retry creation
+
+Claude Code implemented the five scoped use cases and stopped before staging or committing. Its 15-case repository-local exit smoke covered create/list/get payloads, normalization and limits, send idempotency/conflict/active gating, atomic injected failures, retry eligibility and replay, and post-commit provider-run start; static checks and the full pinned-Node gate passed, and throwaway files were removed.
+
+The exit probe also exposed a contract gap: retrying one failed response while a different response in the same conversation was active reached the database's `ux_responses_one_active_per_conversation` backstop and surfaced a raw SQLite uniqueness error. The one-active-response invariant applies to every newly created response, not only sends. The use case now applies `checkActiveResponseGate` only after `classifyRetry` returns `start`; `existing` replay still returns before the gate. SPECS §3.4a/§4.3/§4.5/§4.6 and the INC-05/INC-11 plan text were corrected so the API returns `409 RESPONSE_ALREADY_ACTIVE` with zero writes instead of an internal error.
+
+Independent review inspected all five source files, re-ran full `npm run check` under Node 24.21.0, and ran an 18-assertion real-SQLite smoke covering create/list/get, normalized send, full-object duplicate replay, conflict, new-send active gate, new-retry active gate, retry replay, row counts, post-commit run start, and read-model retry linkage. All passed. `MessageRepo` still lacks `findById`, so duplicate and retry paths re-read conversation history; this is recorded friction rather than widened scope. The implementation checkpoint was committed as `679f52247792a572087301fff063caaaeef404a5`, pushed, and the remote ref was independently verified to match.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)

@@ -54,3 +54,11 @@ For detailed change history, use git history and PRs instead of expanding this f
 - Independent review added cleanup for synchronous backlog/read or sink/write failure so a failed stream attachment cannot leak its buffering subscriber; SPECS §6.4 and the INC-12 regression-test plan now carry this requirement.
 - Validated under pinned Node 24.21.0 with full `npm run check`, Claude Code's 22-case exit smoke, an independent success/failure/abort/recovery/replay probe, static synchronous-handoff checks, and the focused subscriber-cleanup probe.
 - Published implementation checkpoint: `2b8e3b4` (`2b8e3b4fffd5b28358889f0fe6da36c56d663f8b`).
+
+### INC-05 — use cases: complete, 2026-09-28
+
+- Added synchronous create/list/get conversation, send-message, and retry-response use cases with full shared-contract response bodies.
+- Send preserves atomic message/title/response/touch writes, idempotent full-object replay, conflict/active zero-write exits, and starts the provider run only after commit.
+- Execution review extended the one-active-response gate to genuinely new retry replacements. Repeated retry replay still returns its existing active replacement; a different active response now produces `RESPONSE_ALREADY_ACTIVE` instead of leaking a raw SQLite unique-index error.
+- Validated under pinned Node 24.21.0 with full `npm run check`, Claude Code's 15-case exit smoke, static boundary checks, and an independent 18-assertion SQLite smoke.
+- Published implementation checkpoint: `679f522` (`679f52247792a572087301fff063caaaeef404a5`).

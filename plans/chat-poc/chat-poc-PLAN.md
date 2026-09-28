@@ -1,6 +1,6 @@
 # chat-poc — Execution Plan (HOW)
 
-Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-04 are complete and published. Next increment: INC-05. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
+Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-05 are complete and published. Next increment: INC-06. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
 15 increments: `INC-00` … `INC-14`. `INC-00`..`INC-09` are Phase 7 (implementation), `INC-10`..`INC-13` are Phase 11 (tests), `INC-14` is evidence close-out.
 
 ## Read first (every increment)
@@ -81,6 +81,7 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 - Covers: FR-002 (behaviour), FR-008, FR-009, AC-006, AC-008, AC-009, AC-017, one-active-response gate (user-directed correction 2026-09-27).
 - Exit: `npm run typecheck`; a throwaway script runs `send-message` twice with the same key and same content (asserts identical IDs, full `userMessage`/`response` objects returned, provider `runCount === 1`), then with the same key and different content (asserts a thrown conflict and zero new rows), then with a different key while the first response is still `pending` (asserts `RESPONSE_ALREADY_ACTIVE` and zero new rows), then re-sends the **original** key again while that same response is still active (asserts it still succeeds identically). It also retries a failed response while a different response in that conversation is active (asserts `RESPONSE_ALREADY_ACTIVE`, zero writes, and no raw SQLite error), while a repeated retry of its own active replacement still returns that replacement.
 - Trap: the provider run starts **after** the transaction commits, and the HTTP handler does not await it (SPECS §5.5). Apply the active-response gate only after `classifySend` resolves to `new` or `classifyRetry` resolves to `start`; checking earlier would incorrectly block an idempotent replay of the active send or retry.
+- Correction discovered during execution: the original retry path relied on the database's one-active-response index when another response in the conversation was active, surfacing an internal SQLite error. The application gate now runs after `classifyRetry === start`, while `existing` replay returns before it; SPECS §3.4a/§4.3/§4.5/§4.6 and INC-11 carry the corrected contract and regression case.
 
 ### INC-06 — HTTP/SSE transport
 

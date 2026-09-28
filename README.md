@@ -4,7 +4,7 @@ A disposable public TypeScript project for an independent, evidence-backed evalu
 
 ## Baseline and experiment status
 
-The `main` branch and immutable `chat-seed-v1` tag are the non-functional experiment seed. On `experiment/EXP-002`, INC-00 through INC-04 are complete: the corrected toolchain, shared runtime contracts/domain rules, API configuration/domain/port contracts, synchronous SQLite persistence adapters, deterministic provider, stream runner/hub/replay handoff, and boot-recovery logic are implemented. Use cases, transport, bootstrap wiring, UI, and product tests remain.
+The `main` branch and immutable `chat-seed-v1` tag are the non-functional experiment seed. On `experiment/EXP-002`, INC-00 through INC-05 are complete: the corrected toolchain, shared runtime contracts/domain rules, API configuration/domain/port contracts, synchronous SQLite persistence adapters, deterministic provider, stream runner/hub/replay handoff, boot-recovery logic, and conversation/message/retry use cases are implemented. Transport, bootstrap wiring, UI, and product tests remain.
 
 The immutable starting point for `EXP-002` and `GOV-004` is the Git tag `chat-seed-v1`. Rosetta must not be invoked before that seed is created.
 
