@@ -133,6 +133,20 @@ Validation under pinned Node 24.21.0 passed: full `npm run check`; all 16 respon
 
 The repository record types required by SPECS §5.3 were not fully spelled out by field. The implementation chose column-derived `NewConversation`, `NewMessage`, `NewResponse`, `ResponseRecord`, `StreamEventData` and `PersistedEvent` shapes and documents the derivation next to each type. These choices remain subject to concrete adapter validation in INC-03 rather than being claimed as final evidence now.
 
+### 2026-09-28 | unexpected-change | INC-03 session recovered from a transient connection loss without repository loss
+
+The scoped Claude Code INC-03 run lost its connection once while responding. The same native session was resumed, manual approval mode remained in effect, and repository inspection showed the eight persistence files intact. No claim is made about the interruption's cause or duration, and it is not treated as a Rosetta failure or productivity measurement.
+
+### 2026-09-28 | manual-correction | Shell/Python rewrite proposal rejected; repository-local throwaway validation retained
+
+During INC-03, Claude Code proposed a Python heredoc to rewrite `conversation-repo.ts`. It was rejected at the approval boundary because the accepted execution protocol requires normal Edit/Write operations for source changes. Claude then made the change with its Edit tool. A throwaway exit-check script and check log were kept under gitignored `agents/TEMP/` inside the target repository, run under pinned Node 24.21.0, and removed after use; no external scratch path was accepted as experiment evidence. The exit script reported all 32 persistence checks passing, and the full `npm run check` exited 0.
+
+### 2026-09-28 | manual-correction | INC-03 resolved a dependency-rule contradiction and passed independent validation
+
+SPECS §2.2 said `persistence/*` could depend on `ports.ts` types only, while §5.3–§5.4 simultaneously required `EventRepo.append` to call the pure response guard and every read row to use shared/Zod schemas plus `PersistedRecordInvalidError`. The implementation necessarily exposed that contradiction. The rule was corrected narrowly: persistence may import the port interfaces, pure domain guards/errors/types, and shared/Zod validation schemas, but no transport or other outward IO layer. The provider boundary remains ports-types-only.
+
+Independent review inspected every new persistence file, confirmed the exact four tables and seven indexes, verified no executable `await`/`async`/promise scheduling inside persistence and no `lastInsertRowid` use, and re-ran `npm run typecheck`, full `npm run check`, and `git diff --check` under Node 24.21.0. A separate orchestrator-authored temporary smoke outside the repository verified schema idempotence and counts, Promise-return rollback, deterministic conversation/message/event ordering, idempotency rejection with zero extra rows, guarded event sequencing and terminal uniqueness, and close/reopen persistence. It passed and was not committed. INC-03 was committed as `ec2a2448348f6d330926c5d5dff18fea02aa3a73`, pushed, and the remote ref was independently verified to match.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)

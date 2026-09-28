@@ -38,3 +38,11 @@ For detailed change history, use git history and PRs instead of expanding this f
 - Execution review added explicit duplicate-`response.started` rejection and moved Node ambient types to API project configuration.
 - Validated with pinned Node 24.21.0: full `npm run check`, import-boundary check, all 16 transition pairs and append/idempotency/retry smoke cases.
 - Published implementation checkpoint: `71ee630`.
+
+### INC-03 — SQLite persistence: complete, 2026-09-28
+
+- Added the synchronous `node:sqlite` handle, deterministic four-table/seven-index schema, unit of work, row re-validation, and conversation/message/response/event repositories.
+- Preserved the no-`await` transaction boundary, app-generated identifiers, deterministic sequence ordering, DB-backed idempotency/retry/active-response/terminal invariants, and restart-safe file storage.
+- Corrected SPECS §2.2 so the persistence dependency rule permits the pure domain guards/errors and shared/Zod row schemas explicitly required by §5.3–§5.4.
+- Validated under pinned Node 24.21.0 with the full `npm run check`, Claude Code's 32-case exit smoke, and a separate orchestrator smoke covering schema idempotence/counts, sync rollback, ordering, idempotency, event sequencing, terminal-once, and file-backed restart.
+- Published implementation checkpoint: `ec2a244` (`ec2a2448348f6d330926c5d5dff18fea02aa3a73`).
