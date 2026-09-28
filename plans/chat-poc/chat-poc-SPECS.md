@@ -1,6 +1,6 @@
 # chat-poc — Tech Specs (WHAT)
 
-Status: specification checkpoint reviewed; coding-flow Phase 6 is intentionally held before overall approval. Implementation has not started. Target state only. No process, no step order — that is `plans/chat-poc/chat-poc-PLAN.md`.
+Status: specification checkpoint reviewed and implementation in progress; INC-00 through INC-02 are complete. This file remains the target-state contract. No process or step order — that is `plans/chat-poc/chat-poc-PLAN.md`.
 Authority: `docs/REQUIREMENTS.md` (FR-001..FR-011) + `docs/ACCEPTANCE-CRITERIA.md` (AC-001..AC-026) are fixed and read-only. Approved design: Option A Lean Hexagonal + 2 adoptions from Option C, carried into the self-contained §2 below. Living context: `docs/CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/ASSUMPTIONS.md`.
 Every contract element below carries the FR-*/AC-* IDs it satisfies. FR/AC prose is never restated — only the resulting contract.
 

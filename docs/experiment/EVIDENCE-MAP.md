@@ -17,8 +17,8 @@ Status values: `Not started` | `In progress` | `Passed` | `Failed (explanation)`
 | FR-006 | SPECS §5.1, §5.2, §5.3, §5.5 | INC-03 | TBD | TBD | Not started |
 | FR-007 | SPECS §9.3, §9.4, §9.5, §6.5 | INC-08, INC-09 | TBD | TBD | Not started |
 | FR-008 | SPECS §3.4, §4.5, §5.6 | INC-04, INC-05, INC-09 | TBD | TBD | Not started |
-| FR-009 | SPECS §3.4, §4.4, §5.5 | INC-02, INC-05 | TBD | TBD | Not started |
-| FR-010 | SPECS §3.1, §4.1, §5.4, §7.1, §7.2, §7.3, §9.6 | INC-01, INC-02, INC-03, INC-06, INC-08 | INC-01 done: `packages/shared/src/{ids,domain-rules/normalize}.ts`; remaining: INC-02/03/06/08 | TBD | In progress |
+| FR-009 | SPECS §3.4, §4.4, §5.5 | INC-02, INC-05 | INC-02 done: `apps/api/src/domain/idempotency.ts`, `apps/api/src/ports.ts`; remaining: INC-05 use-case wiring | INC-02 throwaway domain smoke passed; automated INC-10/11 coverage pending | In progress |
+| FR-010 | SPECS §3.1, §4.1, §5.4, §7.1, §7.2, §7.3, §9.6 | INC-01, INC-02, INC-03, INC-06, INC-08 | INC-01 done: `packages/shared/src/{ids,domain-rules/normalize}.ts`; INC-02 done: `apps/api/src/config/env.ts`, `apps/api/src/domain/errors.ts`; remaining: INC-03/06/08 | INC-02 full `npm run check` and config/domain smoke passed under Node 24.21.0; automated tests pending | In progress |
 | FR-011 | SPECS §7.4, §7.5 | INC-07 | TBD | TBD | Not started |
 
 ## Acceptance criteria
@@ -32,9 +32,9 @@ Status values: `Not started` | `In progress` | `Passed` | `Failed (explanation)`
 | AC-005 | SPECS §5.1, §5.2 | INC-03, INC-07, INC-11 | TBD | TBD | Not started |
 | AC-006 | SPECS §5.5 | INC-05, INC-11 | TBD | TBD | Not started |
 | AC-007 | SPECS §5.2 | INC-03, INC-11 | TBD | TBD | Not started |
-| AC-008 | SPECS §3.4, §4.4, §5.5 | INC-02, INC-05, INC-11 | TBD | TBD | Not started |
-| AC-009 | SPECS §3.4, §4.4, §5.5 | INC-02, INC-05, INC-11 | TBD | TBD | Not started |
-| AC-010 | SPECS §3.2, §5.2, §6.2 | INC-02, INC-03, INC-04, INC-12 | TBD | TBD | Not started |
+| AC-008 | SPECS §3.4, §4.4, §5.5 | INC-02, INC-05, INC-11 | INC-02 done: `apps/api/src/domain/idempotency.ts` (`classifySend` duplicate path); remaining: INC-05/11 | INC-02 throwaway domain smoke passed; automated INC-11 coverage pending | In progress |
+| AC-009 | SPECS §3.4, §4.4, §5.5 | INC-02, INC-05, INC-11 | INC-02 done: `apps/api/src/domain/idempotency.ts` (`classifySend` conflict path); remaining: INC-05/11 | INC-02 throwaway domain smoke passed; automated INC-11 coverage pending | In progress |
+| AC-010 | SPECS §3.2, §5.2, §6.2 | INC-02, INC-03, INC-04, INC-12 | INC-02 done: `apps/api/src/domain/response-machine.ts` (all transitions, first/duplicate-start, delta-status and terminal guards); remaining: INC-03/04/12 | INC-02 throwaway smoke passed all 16 transition pairs and append guards; automated INC-12 coverage pending | In progress |
 | AC-011 | SPECS §6.4 | INC-04, INC-12 | TBD | TBD | Not started |
 | AC-012 | SPECS §6.3, §4.6 | INC-01, INC-06, INC-12 | INC-01 done: `packages/shared/src/contracts/params.ts` (`parseLastEventId`); remaining: INC-06 route wiring, INC-12 tests | TBD | In progress |
 | AC-013 | SPECS §9.4 (rules 1, 3, 6), §6.5 | INC-08, INC-13 | TBD | TBD | Not started |

@@ -117,6 +117,22 @@ The version mismatch is a study finding: the exact process that executed the pla
 - Why: the clean command could delete user or evidence files, while index mutation is unnecessary for review and can disturb the accepted checkpoint.
 - Resulting state: final clean-checkout verification now runs in a separate disposable fresh clone/worktree, and review uses read-only diffs or explicitly stages only the files intended for the checkpoint commit.
 
+### 2026-09-28 | unexpected-change | First INC-02 implementation attempt was interrupted by host sleep
+
+The first resumed Claude Code run delegated INC-02 to the Rosetta engineer workflow, but the computer slept while it was running. On resume, the workflow watchdog reported no progress for its 600-second window and stopped the agent. Inspection confirmed that this attempt wrote no target-repository files. The implementation was restarted in a fresh Claude Code session. This is classified as a host/session interruption, not a Rosetta implementation failure, and no productivity inference is made from the watchdog duration.
+
+### 2026-09-28 | unexpected-change | Overlapping interactive prompts temporarily changed approval state and installed a host-side language server
+
+While restoring manual approval mode in the fresh session, overlapping Claude Code prompts caused input intended for one prompt to be consumed by another. The session briefly entered accept-edits/automatic and plan states, and a suggested `typescript-lsp` host-side tool was accepted. Manual approval mode was restored before the remaining scoped implementation. Repository inspection found no unrequested target-repository change from this prompt race; the language-server installation is a host-side change only. This observation is retained because approval UX is relevant to the independent workflow evaluation.
+
+### 2026-09-28 | manual-correction | INC-02 review closed two specification/configuration gaps
+
+Claude Code implemented API configuration, domain types/errors, pure decision modules and ports, then stopped before staging or committing. Independent review found two issues and corrected both before publication: (1) API Node ambient types were initially enabled by a file-local triple-slash directive because TypeScript 7 did not resolve `node:process`; the durable fix is now `"types": ["node"]` in `apps/api/tsconfig.json`, with the local directive removed; (2) `checkAppend` enforced first-event and terminal rules but allowed a second `response.started`, contradicting SPECS §6.2's exactly-one-start invariant. SPECS §3.2 and the implementation now return `already-started` for that case. The stale §2.1 `canRetry` label was also aligned to the implemented §3.4 `classifyRetry` contract.
+
+Validation under pinned Node 24.21.0 passed: full `npm run check`; all 16 response-status transition pairs; first/duplicate-start, delta-status and terminal append guards; idempotency, retry and active-response decisions; domain import-boundary grep; and `git diff --check`. The implementation was committed as `71ee630324f9b6b0db430f52e29bbecaca5940db`, pushed to `origin/experiment/EXP-002`, and the remote ref was independently verified to match.
+
+The repository record types required by SPECS §5.3 were not fully spelled out by field. The implementation chose column-derived `NewConversation`, `NewMessage`, `NewResponse`, `ResponseRecord`, `StreamEventData` and `PersistedEvent` shapes and documents the derivation next to each type. These choices remain subject to concrete adapter validation in INC-03 rather than being claimed as final evidence now.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)

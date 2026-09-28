@@ -22,6 +22,19 @@ For detailed change history, use git history and PRs instead of expanding this f
 - Updated `.gitignore` (Rosetta entries), added `.prettierignore`.
 - No product code changed.
 
-### [Workstream name]: [status], [YYYY-MM-DD]
+### INC-00 — toolchain foundation: complete, 2026-09-27
 
-- [Brief changes with keywords, FR/AC IDs, and references]
+- Corrected TypeScript project-reference build order, test isolation, Vitest projects, and web jsdom setup (AC-001).
+- Published checkpoint: `a20c0bb`; evidence follow-up: `aa6a319`.
+
+### INC-01 — shared contracts and domain rules: complete, 2026-09-27
+
+- Added shared Zod contracts, branded identifiers, normalization, title, terminal and Last-Event-ID rules (FR-010; AC-004, AC-012, AC-019).
+- Published checkpoint: `e3900d5`; evidence follow-up: `bc35ec1`.
+
+### INC-02 — API config, domain and ports: complete, 2026-09-28
+
+- Added fail-fast API env parsing, domain types/errors, response state machine, idempotency and retry decisions, active-response gate, provider/repository ports (FR-009, FR-010; AC-008, AC-009, AC-010).
+- Execution review added explicit duplicate-`response.started` rejection and moved Node ambient types to API project configuration.
+- Validated with pinned Node 24.21.0: full `npm run check`, import-boundary check, all 16 transition pairs and append/idempotency/retry smoke cases.
+- Published implementation checkpoint: `71ee630`.
