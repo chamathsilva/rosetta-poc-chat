@@ -41,3 +41,22 @@ export const errorEnvelopeSchema = z
   })
   .strict();
 export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;
+
+/**
+ * Fixed ZodError issue.code → details[i].message map (SPECS §4.6, AC-021).
+ * Detail messages come only from here, so no received value is ever echoed.
+ * Keyed by every Zod 4 issue code, so a new code is a compile error.
+ */
+export const VALIDATION_ISSUE_MESSAGES: Readonly<Record<z.core.$ZodIssueCode, string>> = {
+  invalid_type: "Value has the wrong type.",
+  too_big: "Value is too large.",
+  too_small: "Value is too small.",
+  invalid_format: "Value has an invalid format.",
+  not_multiple_of: "Value is not an allowed multiple.",
+  unrecognized_keys: "Object contains unknown fields.",
+  invalid_union: "Value does not match any allowed shape.",
+  invalid_key: "Object contains an invalid key.",
+  invalid_element: "Collection contains an invalid element.",
+  invalid_value: "Value is not one of the allowed values.",
+  custom: "Value is invalid.",
+};
