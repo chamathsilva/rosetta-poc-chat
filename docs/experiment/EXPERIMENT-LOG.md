@@ -147,6 +147,18 @@ SPECS §2.2 said `persistence/*` could depend on `ports.ts` types only, while §
 
 Independent review inspected every new persistence file, confirmed the exact four tables and seven indexes, verified no executable `await`/`async`/promise scheduling inside persistence and no `lastInsertRowid` use, and re-ran `npm run typecheck`, full `npm run check`, and `git diff --check` under Node 24.21.0. A separate orchestrator-authored temporary smoke outside the repository verified schema idempotence and counts, Promise-return rollback, deterministic conversation/message/event ordering, idempotency rejection with zero extra rows, guarded event sequencing and terminal uniqueness, and close/reopen persistence. It passed and was not committed. INC-03 was committed as `ec2a2448348f6d330926c5d5dff18fea02aa3a73`, pushed, and the remote ref was independently verified to match.
 
+### 2026-09-28 | unexpected-change | INC-04's first long instruction paste was clipped
+
+The resumed Claude Code terminal accepted only the tail of the first detailed INC-04 instruction paste. No implementation was accepted on that ambiguous basis. A shorter corrective prompt explicitly restated the exact seven-file boundary, pinned Node version, manual approval mode, required checks, and stop-before-commit rule; Claude confirmed that scope before writing files. This is retained as an interaction finding, not attributed to Rosetta and not converted into a productivity claim.
+
+### 2026-09-28 | manual-correction | INC-04 review closed a failed-attachment subscriber leak
+
+Claude Code implemented the deterministic provider, provider doubles, response runner, live hub, replay/live subscriber and restart recovery within the accepted INC-04 boundary. Its 22-case throwaway exit check and full `npm run check` passed under Node 24.21.0, and the temporary repository-local check files were removed.
+
+Independent review then inspected all seven source files and re-ran the full check. A separate orchestrator-authored probe passed deterministic chunks, success completion, fixed/redacted provider failure, abort-to-`PROVIDER_INTERRUPTED`, persist-before-publish, zero-event recovery, partial-stream recovery, recovery idempotence, and replay/live deduplication. Review found one additional robustness defect: after installing the buffering subscription, a synchronous `listAfter` or sink-write exception could leave that subscriber registered. `attachResponseStream` now unsubscribes before rethrowing; a focused regression probe confirmed that publishing afterward reaches no leaked sink. SPECS §6.4 and INC-12's named-test list were updated so the correction remains part of the durable contract.
+
+The implementation checkpoint was committed as `2b8e3b4fffd5b28358889f0fe6da36c56d663f8b`, pushed to `origin/experiment/EXP-002`, and the remote ref was independently verified before this evidence follow-up. Two bounded implementation frictions remain documented without widening INC-04: `MessageRepo` has no `findById`, so completion re-reads the conversation to obtain the inserted assistant row; the provider port has no abort signal, so the runner races pending `next()` calls against abort and requests iterator return without awaiting it. Both are acceptable under the current deterministic/local provider boundary and will be re-evaluated during INC-07 shutdown wiring and INC-11 tests.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)

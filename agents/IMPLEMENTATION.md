@@ -46,3 +46,11 @@ For detailed change history, use git history and PRs instead of expanding this f
 - Corrected SPECS §2.2 so the persistence dependency rule permits the pure domain guards/errors and shared/Zod row schemas explicitly required by §5.3–§5.4.
 - Validated under pinned Node 24.21.0 with the full `npm run check`, Claude Code's 32-case exit smoke, and a separate orchestrator smoke covering schema idempotence/counts, sync rollback, ordering, idempotency, event sequencing, terminal-once, and file-backed restart.
 - Published implementation checkpoint: `ec2a244` (`ec2a2448348f6d330926c5d5dff18fea02aa3a73`).
+
+### INC-04 — provider and stream coordination: complete, 2026-09-28
+
+- Added the deterministic provider and provider doubles, persist-before-publish response runner, response-keyed live hub, synchronous replay/live handoff, and restart recovery for both zero-event pending and partial-stream responses.
+- Provider failures use fixed safe messages; provider-supplied and thrown messages are not persisted or emitted. Completion persists the assistant message and terminal event atomically.
+- Independent review added cleanup for synchronous backlog/read or sink/write failure so a failed stream attachment cannot leak its buffering subscriber; SPECS §6.4 and the INC-12 regression-test plan now carry this requirement.
+- Validated under pinned Node 24.21.0 with full `npm run check`, Claude Code's 22-case exit smoke, an independent success/failure/abort/recovery/replay probe, static synchronous-handoff checks, and the focused subscriber-cleanup probe.
+- Published implementation checkpoint: `2b8e3b4` (`2b8e3b4fffd5b28358889f0fe6da36c56d663f8b`).
