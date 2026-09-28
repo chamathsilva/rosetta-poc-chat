@@ -216,7 +216,7 @@ export type SendGate = "ok" | "blocked";
 export function checkActiveResponseGate(hasActiveResponse: boolean): SendGate;
 ```
 
-`checkActiveResponseGate` is `hasActiveResponse ? "blocked" : "ok"` — trivial on its own, but its **position in the check order is load-bearing**: it is evaluated **only** when `classifySend` has already returned `{ kind: "new" }`. A `duplicate` or `conflict` decision short-circuits before this gate runs, so replaying the same `clientMessageId` that itself created the currently-active response still succeeds identically (§4.4, §5.5 step 2b) — the gate blocks only a genuinely *new* send while one is in flight, never a replay of the one that is in flight.
+`checkActiveResponseGate` is `hasActiveResponse ? "blocked" : "ok"` — trivial on its own, but its **position in each check order is load-bearing**. For send, it is evaluated **only** when `classifySend` has already returned `{ kind: "new" }`; a `duplicate` or `conflict` decision short-circuits before the gate. For retry, it is evaluated **only** when `classifyRetry` has returned `{ kind: "start" }`; an `existing` or `rejected` decision short-circuits first. Therefore replaying either the send or retry that owns the currently-active response still succeeds identically. The gate blocks only creation of a genuinely *new* active response while another is in flight (§4.4, §4.5, §5.5).
 
 - `classifyRetry` check order is fixed and load-bearing: (1) `target.retryOfResponseId !== null` ⇒ `rejected: RETRY_NOT_ALLOWED` (A-003, including a failed replacement); (2) `existingReplacementId !== null` ⇒ `existing` (AC-017 repeated retry); (3) `target.status !== "failed"` ⇒ `rejected: RESPONSE_NOT_FAILED`; (4) ⇒ `start`.
 
@@ -286,7 +286,7 @@ All schemas are Zod 4.6.5, exported with `z.infer` types, and are the single def
 | `GET /api/conversations` | — | `200` | `listConversationsResponseSchema = { conversations: ConversationSummary[] }` | `INTERNAL_ERROR` |
 | `GET /api/conversations/:conversationId` | `conversationParamsSchema` | `200` | `getConversationResponseSchema = { conversation, messages, responses, activeResponse: Response \| null }` | `VALIDATION_FAILED`, `NOT_FOUND` |
 | `POST /api/conversations/:conversationId/messages` | `sendMessageRequestSchema = z.object({ clientMessageId, content: z.string() }).strict()` | `202` | `sendMessageAcceptedSchema = { conversationId, userMessage: Message, response: Response }` | `VALIDATION_FAILED`, `NOT_FOUND`, `IDEMPOTENCY_KEY_CONFLICT`, `RESPONSE_ALREADY_ACTIVE`, `SERVICE_UNAVAILABLE` |
-| `POST /api/responses/:responseId/retry` | `responseParamsSchema` | `202` | `retryAcceptedSchema = { conversationId, responseId, retryOfResponseId }` | `VALIDATION_FAILED`, `NOT_FOUND`, `RESPONSE_NOT_FAILED`, `RETRY_NOT_ALLOWED`, `SERVICE_UNAVAILABLE` |
+| `POST /api/responses/:responseId/retry` | `responseParamsSchema` | `202` | `retryAcceptedSchema = { conversationId, responseId, retryOfResponseId }` | `VALIDATION_FAILED`, `NOT_FOUND`, `RESPONSE_NOT_FAILED`, `RETRY_NOT_ALLOWED`, `RESPONSE_ALREADY_ACTIVE`, `SERVICE_UNAVAILABLE` |
 | `GET /api/responses/:responseId/events` | `responseParamsSchema` + `Last-Event-ID` header (§6.3) | `200 text/event-stream` | §6 | `VALIDATION_FAILED`, `NOT_FOUND`, `INVALID_LAST_EVENT_ID`, `LAST_EVENT_ID_OUT_OF_RANGE` |
 | `GET /health` | — | `200` / `503` | `healthResponseSchema = { status: z.enum(["ok","unavailable"]), database: z.enum(["ok","error"]) }` | not enveloped |
 
@@ -302,7 +302,7 @@ One `202` for both outcomes: a newly created pair, and an idempotent replay whic
 
 ### 4.5 Retry semantics (FR-008, AC-017, A-003, R5)
 
-One `202` for both a freshly created replacement and a repeated request that returns the existing replacement. Rejections are `409`. A retry creates a new response row for the **same** `userMessageId` and inserts no new message row (AC-017).
+One `202` for both a freshly created replacement and a repeated request that returns the existing replacement. Rejections are `409`. A retry creates a new response row for the **same** `userMessageId` and inserts no new message row (AC-017). After `classifyRetry` returns `start`, but before any insert, the use case applies the §3.4a active-response gate. If another response in the conversation is `pending` or `streaming`, it throws `RESPONSE_ALREADY_ACTIVE` with zero writes. An `existing` retry replay returns before this gate, preserving idempotency while its replacement is active. The database unique index remains the race-condition backstop, not the intended API error path.
 
 ### 4.6 Error envelope — `contracts/errors.ts` (FR-002, FR-010, AC-021)
 
@@ -325,7 +325,7 @@ export const errorEnvelopeSchema = z.object({
 | `IDEMPOTENCY_KEY_CONFLICT` | 409 | AC-009 |
 | `RESPONSE_NOT_FAILED` | 409 | retry target not `failed` |
 | `RETRY_NOT_ALLOWED` | 409 | target is itself a replacement (A-003) |
-| `RESPONSE_ALREADY_ACTIVE` | 409 | a new send attempted while the conversation already has a `pending`/`streaming` response (§3.4a); never raised for a duplicate-key replay of the send that created it |
+| `RESPONSE_ALREADY_ACTIVE` | 409 | a new send or new retry replacement attempted while the conversation already has a `pending`/`streaming` response (§3.4a); never raised for an idempotent replay of the send or retry that created it |
 | `SERVICE_UNAVAILABLE` | 503 | draining (§7.3) |
 | `INTERNAL_ERROR` | 500 | anything unmapped |
 | `DATABASE_UNAVAILABLE` | 503 | SQLite open/health failure at request time |
