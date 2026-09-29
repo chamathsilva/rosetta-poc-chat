@@ -1,6 +1,6 @@
 # chat-poc — Execution Plan (HOW)
 
-Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-07 are complete and published. Next increment: INC-08. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
+Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-08 are complete and published. Next increment: INC-09. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
 15 increments: `INC-00` … `INC-14`. `INC-00`..`INC-09` are Phase 7 (implementation), `INC-10`..`INC-13` are Phase 11 (tests), `INC-14` is evidence close-out.
 
 ## Read first (every increment)
@@ -102,11 +102,12 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 
 ### INC-08 — Web foundation: config, API client, SSE client, reducer
 
-- Files: `apps/web/src/config/env.ts`, `api/{http-client,sse-client}.ts`, `state/{ui-status,chat-reducer}.ts`.
-- Spec: §6.5, §7.2, §9.1, §9.2, §9.3, §9.4.
+- Files: `apps/web/src/config/env.ts`, `api/{http-client,sse-client}.ts`, `state/{ui-status,chat-reducer}.ts`; plus the `vite/client` `types` entry in `apps/web/tsconfig.json` and `tsconfig.test.json` (approved scope extension, see corrections below).
+- Spec: §6.5, §7.2, §8.2, §9.1, §9.2, §9.3, §9.4.
 - Covers: FR-005 (client side), FR-007, FR-010 (env), AC-004, AC-013, AC-018 (vocabulary).
 - Exit: `npm run typecheck`. Grep proves `EventSource` appears nowhere in `apps/web`. `chat-reducer.ts` imports no `react`, no `fetch`, no `Date`.
 - Trap: the two seeding branches of SPECS §9.4 rule 6 are the AC-013 duplication bug. An active response seeds empty text and replays from 0; a terminal one seeds text and never opens a stream.
+- Corrections discovered during execution: `config/env.ts` reads `import.meta.env` (SPECS §7.2), but neither `apps/web/tsconfig.json` nor `tsconfig.test.json` loaded Vite's client types, so it could not typecheck. By evaluator decision, both files gained `vite/client` in `types` (`tsconfig.test.json` keeps `node`); both are therefore in INC-08's approved scope even though INC-00 otherwise owns all tsconfig files. INC-09 note: rule 6 re-seeds every response on `conversation/loaded`, so the hook must not reload a conversation whose response stream is open, or must reopen that stream from 0 afterwards.
 
 ### INC-09 — Web orchestration and components
 
@@ -168,7 +169,7 @@ Ownership is by directory, so no two concurrent increments write the same file.
 | INC-05 | `apps/api/src/usecases/**` |
 | INC-06 | `apps/api/src/http/**` |
 | INC-07 | `apps/api/src/bootstrap/**`, `apps/api/src/index.ts`, rest of `apps/api/src/testing/**` |
-| INC-08 | `apps/web/src/{config,api}/**`, `apps/web/src/state/{ui-status,chat-reducer}.ts` |
+| INC-08 | `apps/web/src/{config,api}/**`, `apps/web/src/state/{ui-status,chat-reducer}.ts`; the `vite/client` `types` entry in `apps/web/tsconfig.json` and `tsconfig.test.json` (execution-discovered, evaluator-approved) |
 | INC-09 | `apps/web/src/{components,hooks}/**`, `state/ChatProvider.tsx`, `main.tsx`, `index.html` |
 | INC-10 | `packages/shared/src/**/*.test.ts`, `apps/api/src/{domain,provider}/*.test.ts`, `apps/api/src/http/{error-envelope,logging}.test.ts`, `apps/web/src/{state/chat-reducer,api/sse-client}.test.ts` |
 | INC-11 | `apps/api/src/{http/routes,usecases,persistence}/*.test.ts`, `apps/api/src/stream/recovery.test.ts`, `apps/api/src/bootstrap/shutdown.test.ts` |

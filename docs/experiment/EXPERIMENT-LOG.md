@@ -193,6 +193,31 @@ The same review found that `temp-db.ts` legitimately uses `node:os.tmpdir()` as 
 
 Claude Code's guided checks also passed normal startup/health, same-file restart with both recovery branches, bounded drain, second-signal behavior, helper contracts, the exhaustive startup-log check, and the full repository gate. Independent review inspected all six implementation files, re-ran `npm run check` under Node 24.21.0, and ran a separate 12-assertion probe covering composition, recovery count, health, clock advancement, sequential UUIDs, invalid prefixes, drain state, database closure and temp cleanup. All passed. Implementation checkpoint `4aa99d7c9e21cf99f185799763288cac8584e8ee` was pushed and the remote ref was independently verified to match.
 
+### 2026-09-29 | execution-context | INC-08 resumed after an interrupted session
+
+The first INC-08 session ended while a throwaway validation script was being written, before any validation ran. On resume, inspection showed the five INC-08 source files and the two tsconfig edits intact, no leftover API process on port 8787, and an empty temporary validation directory: the script had never been written. The evaluator confirmed that the rejected temp-file call was caused by the interruption, not by a decision to skip validation. The resumed execution ran on Claude Code `2.1.284`, the version the evaluator identified for that session. A `claude --version` query issued during validation returned `2.1.285`, so the installed CLI binary had already moved ahead of the running session. Both values are retained, in the same way as the earlier version drift, and neither replaces the other. The Claude Pro account, manual approval mode, and Git settings were left unchanged.
+
+### 2026-09-29 | manual-correction | INC-08 needed Vite client types; review fixed three contract defects
+
+`apps/web/src/config/env.ts` must read `import.meta.env` (SPECS §7.2), but neither `apps/web/tsconfig.json` nor `tsconfig.test.json` loaded Vite's client types, so it could not typecheck. Both files belong to INC-00. Given the choice between a tsconfig change and a file-local reference directive, the evaluator chose the tsconfig change: `apps/web/tsconfig.json` gained `"types": ["vite/client"]`, and `tsconfig.test.json` now lists `["node", "vite/client"]`. PLAN INC-08 scope and ownership, and SPECS §7.2/§8.2, now record both files.
+
+A critical re-review against SPECS §6.5, §7.2, §8.1–§8.2 and §9.1–§9.4 found three defects in the uncommitted INC-08 code, all fixed before validation:
+1. `conversation/loaded` kept an already-open response entry instead of re-seeding it, which departed from §9.4 rule 6 without approval. It now follows the rule literally, and PLAN INC-08 carries the resulting INC-09 note: do not reload a conversation whose stream is open, or reopen that stream from 0.
+2. In `sse-client.ts`, the read loop's error guard also caught exceptions thrown by the `onEvent` callback, which would have misreported a consumer bug as a `network` close and triggered reconnects. Only `reader.read()` is guarded now.
+3. The same file never flushed the `TextDecoder` at the end of the body. It now does.
+
+Earlier in the session, header comments that contained the literal grep targets (`EventSource`, `Date`, `fetch`) were reworded so the plan's exit greps check the code, not the prose.
+
+Isolated live validation loaded the real web modules through Vite's SSR loader, with no changes to them. It drove the modules against a `dev:api` process controlled by exact PID with its database in a `mktemp -d` directory, plus a local fake SSE server. All 14 check groups passed:
+- configuration defaults and redaction;
+- HTTP client parsing, and every §9.2 classification row;
+- live SSE replay, resume and error envelopes;
+- heartbeat, invalid frames, id≠seq frames, split multi-byte chunks, early body end, abort, and consumer exceptions;
+- reducer rules 1–7, including an AC-013 replay over an active seed and AC-008 duplicate reconciliation;
+- no mutation of reducer input.
+
+The INC-08 exit gate then passed under Node 24.21.0: `npm run typecheck`, no `EventSource` anywhere in `apps/web` (including emitted output), and no `react`/`fetch`/`Date` in `chat-reducer.ts`. The full `npm run check` and `git diff --check` also passed. Nothing was staged or committed.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)

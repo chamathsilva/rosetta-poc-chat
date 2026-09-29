@@ -567,6 +567,8 @@ No other env var may alter behaviour — in particular there is no provider-sele
 
 `VITE_API_BASE_URL`: `z.url()`, default `http://localhost:8787`, parsed from `import.meta.env` at module load; failure throws before render. No Vite dev proxy exists, so the browser calls the API cross-origin and CORS is genuinely exercised (AC-023).
 
+`import.meta.env` typechecks only when Vite's client types are loaded: `apps/web/tsconfig.json` sets `"types": ["vite/client"]`, and `tsconfig.test.json` loads `vite/client` beside `node` (§8.2). Execution-discovered in INC-08 (2026-09-29); approved by the evaluator.
+
 ### 7.3 CORS — `http/server.ts` (FR-010, AC-023)
 
 `@fastify/cors` registered with `origin: [config.webOrigin]` (exact string match, no wildcard, no regex, no reflection), `methods: ["GET","POST","OPTIONS"]`, `allowedHeaders: ["content-type","last-event-id"]`, `credentials: false`, `maxAge: 600`. `last-event-id` must be in `allowedHeaders` or the cross-origin SSE request of §6.5 fails preflight. A request from any other origin receives no `access-control-allow-origin` header; the preflight for it returns `204` without that header (AC-023 asserts absence for a foreign origin and presence for the configured one).
@@ -611,7 +613,7 @@ Requires dedicated automated coverage (INC-11, `bootstrap/shutdown.test.ts`): (1
 
 ### 8.2 Test files out of `dist` (finalized)
 
-Each package `tsconfig.json` gains `"exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]`. A new root `tsconfig.test.json` (`noEmit`, `moduleResolution: "Bundler"`, `jsx: "react-jsx"`, DOM libs, `types: ["node"]`) includes `apps/**/*.test.ts`, `apps/**/*.test.tsx`, `packages/**/*.test.ts`, `apps/web/test/setup.ts`, `apps/web/vite.config.ts`, `vitest.config.ts`. Net effect: tests and both config files are strictly typechecked, nothing test-related is emitted to `dist`, and `apps/web/vite.config.ts` stops being untypechecked (a seed gap). `apps/api/src/testing/**` stays inside the build project — it imports no test framework.
+Each package `tsconfig.json` gains `"exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]`. A new root `tsconfig.test.json` (`noEmit`, `moduleResolution: "Bundler"`, `jsx: "react-jsx"`, DOM libs, `types: ["node", "vite/client"]` — `vite/client` added in INC-08 so web tests that import `config/env.ts` typecheck, §7.2) includes `apps/**/*.test.ts`, `apps/**/*.test.tsx`, `packages/**/*.test.ts`, `apps/web/test/setup.ts`, `apps/web/vite.config.ts`, `vitest.config.ts`. Net effect: tests and both config files are strictly typechecked, nothing test-related is emitted to `dist`, and `apps/web/vite.config.ts` stops being untypechecked (a seed gap). `apps/api/src/testing/**` stays inside the build project — it imports no test framework.
 
 ### 8.3 Vitest projects (A-013 finalized; Vitest is exactly 5.0.0)
 
