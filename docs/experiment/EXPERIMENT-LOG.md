@@ -218,6 +218,57 @@ Isolated live validation loaded the real web modules through Vite's SSR loader, 
 
 The INC-08 exit gate then passed under Node 24.21.0: `npm run typecheck`, no `EventSource` anywhere in `apps/web` (including emitted output), and no `react`/`fetch`/`Date` in `chat-reducer.ts`. The full `npm run check` and `git diff --check` also passed. Nothing was staged or committed.
 
+### 2026-09-30 | execution-context | INC-09 host and a substituted exit smoke
+
+INC-09 ran from committed PLAN/SPECS at `2032832` on Claude Code `2.1.285`, model `opus-5-5`, medium effort, with manual approval mode and the existing Claude and Git accounts unchanged. Every runtime command ran under Node 24.21.0.
+
+The plan's INC-09 exit is a manual, keyboard-only smoke in a real browser, ending with a console check for zero errors and zero CORS warnings. The session's browser-automation connection was unavailable, so that literal browser pass could not be run and is **not** claimed here. Two substitutes ran instead, both from a `mktemp -d` directory and with every process controlled by exact PID:
+- **Real servers.** A throwaway API harness used the real INC-07 container with a routed provider: `failingProvider` on a content's first run, `delayedProvider` for slow streams, the default otherwise. `npm run dev:web` ran beside it. Vite served the page with its new title, and all 14 web modules transformed with HTTP 200 and no errors or warnings. The GET and both preflights (`content-type` for POST, `last-event-id` for the event stream) from `http://localhost:5173` returned `access-control-allow-origin: http://localhost:5173`.
+- **Keyboard-only jsdom smoke.** The real `App` + `ChatProvider` ran under StrictMode, loaded through Vite with the real config, against the live API, using only `user.tab`/`user.keyboard`. All 11 checks passed:
+  - skip link → New conversation → conversation buttons → textarea → Send → Retry order;
+  - create moves focus to the composer;
+  - Enter sends and deltas grow as prefixes up to the completed message;
+  - Shift+Enter inserts a newline;
+  - `?c=` is written and a conversation is selected by keyboard;
+  - refresh mid-stream restores the selection and resumes without duplicated text or messages;
+  - failure shows visibly with an assertive alert, and Space on Retry unmounts the button, returns focus to the composer and completes the replacement with one user message;
+  - `<img src=x onerror=…>` renders as text with no `img` element;
+  - whitespace-only input gives a validation alert with `aria-invalid`;
+  - zero console errors or warnings, and no unhandled rejections.
+
+  jsdom uses Node's `fetch`, which does not enforce CORS; the curl checks above cover CORS.
+
+The full `npm run check` then passed, with the production bundle now built from the app, and `git diff --check` passed. Findings for independent review are in PLAN INC-09: composer-before-list DOM and layout for the §9.6 tab order, `<style>`-as-text CSS, and a synchronously tracked selection that honors the INC-08 reload note. Two fixes were to the throwaway smoke harness only and changed no product code: resolving the user-event CommonJS module shape, and correcting a wrong tab-order expectation for the newest-first conversation list. Two further fixes were **product** fixes, made during self-review before any validation run: the URL writer briefly cleared `?c=` on mount, and React StrictMode's double mount could load the selected conversation twice, which would re-seed an open stream (the INC-08 hazard). Nothing was staged or committed.
+
+### 2026-09-30 | manual-correction | INC-09 review: stale cross-conversation results and favicon 404
+
+The evaluator's independent real-browser probe delayed a conversation's send error, created a new conversation, then released the error. The new conversation showed the old conversation's error. The cause was that the provider's send, retry and load callbacks dispatched their results unconditionally, except for a conversation-id check on loads, and that check cannot reject an A → B → A sequence.
+
+Fix, product code in `ChatProvider.tsx`:
+- Every selection change (select, NOT_FOUND deselect, create) bumps a selection generation.
+- Send, retry and load results are dispatched only when the generation is unchanged since the request.
+- Retained network-failure send keys are now kept per conversation. The key bookkeeping still runs after a switch, because it describes the server-side send, not the screen.
+
+The same probe saw `favicon.ico` return 404. `apps/web/index.html` gained `<link rel="icon" href="data:," />`, which is a narrow deviation from INC-09's title-only scope for that file. It adds no asset and changes no behaviour; PLAN INC-09 records it.
+
+Validation ran under Node 24.21.0 in the same `mktemp -d` directory, with every process controlled by exact PID. The evaluator's own `independent.sqlite*` files in that directory were preserved. A new release-gated probe of the real app ran under StrictMode against the live API harness. It wraps `fetch` so that a request either rejects as a network error on release, or takes a server snapshot immediately and delivers it on release. All 7 checks passed:
+- the reported case;
+- per-conversation keys (fresh key in B, A's retained key reused in A);
+- send result dropped after A → B → A;
+- an older load snapshot, delivered late after A → B → A, does not re-seed A;
+- a retry result is not shown after switching;
+- zero console errors or warnings, and no unhandled rejections.
+
+The probe was not run against the pre-fix code as a negative control; the evaluator's real-browser probe is the failure evidence. The 11-check keyboard-only smoke passed again with no regression. The full `npm run check`, the source greps and `git diff --check` passed, and the built `index.html` carries the icon link. Nothing was staged or committed.
+
+### INC-09 independent acceptance — 2026-09-30
+
+The evaluator reran the reported delayed-send-error reproduction in an isolated real browser: the corrected provider suppresses the old error and preserves the new conversation's draft. A real-browser A → B → A probe released an old empty load snapshot during a newer slow response; the response completed with the expected text and one user message. A separate normal-flow session passed refresh recovery, keyboard Retry/focus and escaped-text rendering with zero console errors and warnings. Deliberately injected HTTP failures were excluded from that normal-console claim.
+
+The literal `npm run dev:api` plus `npm run dev:web` path was also checked with the default provider and a fresh disposable database: keyboard create/send completed and refresh retained the selection with one user message. A fresh browser console reported zero errors and warnings. Independent final `npm run check` and `git diff --check` passed under Node 24.21.0; the runner still reported no product tests. The implementation increment is accepted, not the whole case study. INC-10 through INC-13 tests and INC-14 close-out remain.
+
+Preserved review, raw validation output and parameterized snapshots of the temporary probes are in the independent evaluation repository under `evidence/EXP-002/INC-09-REVIEW.md`, `INC-09-VALIDATION.md` and `validation/inc09/`. Parameterization replaced only the local checkout path. INC-13 now explicitly carries the async-selection/key-scoping regression cases. The evaluator observed a development-only Vite Fast Refresh fallback to full reload while editing the provider's mixed exports; no seamless-HMR claim is made.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)

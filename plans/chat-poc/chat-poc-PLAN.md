@@ -1,6 +1,6 @@
 # chat-poc — Execution Plan (HOW)
 
-Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-08 are complete and published. Next increment: INC-09. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
+Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-09 are complete. Publication checkpoints are recorded in the independent evaluation repository. Next increment: INC-10. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
 15 increments: `INC-00` … `INC-14`. `INC-00`..`INC-09` are Phase 7 (implementation), `INC-10`..`INC-13` are Phase 11 (tests), `INC-14` is evidence close-out.
 
 ## Read first (every increment)
@@ -111,11 +111,12 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 
 ### INC-09 — Web orchestration and components
 
-- Files: `apps/web/src/state/ChatProvider.tsx`, `hooks/{useSelectedConversation,useResponseStream}.ts`, `components/{App,ConversationList,MessageList,MessageComposer,StatusAnnouncer,RetryButton}.tsx`, `apps/web/src/main.tsx`, `apps/web/index.html` (title only).
+- Files: `apps/web/src/state/ChatProvider.tsx`, `hooks/{useSelectedConversation,useResponseStream}.ts`, `components/{App,ConversationList,MessageList,MessageComposer,StatusAnnouncer,RetryButton}.tsx`, `apps/web/src/main.tsx`, `apps/web/index.html` (title, plus a minimal `data:` favicon link — narrow scope deviation, see findings).
 - Spec: §9.5, §9.6, §6.5 (reconnect policy).
 - Covers: FR-001, FR-007, FR-008 (retry affordance), AC-002, AC-018, AC-020, AC-022.
 - Exit: `npm run dev:web` + `npm run dev:api`; manual smoke with pointer disabled (keyboard only): create → select → send → watch deltas → completed; then refresh mid-stream and confirm the conversation and the response resume with no duplicated text; then run with `failingProvider` wired through a temp container and confirm a visible failure plus a working Retry. Browser console shows zero errors and zero CORS warnings.
 - Trap: no `dangerouslySetInnerHTML` / `innerHTML` / `insertAdjacentHTML` anywhere (SPECS §9.6); the `.sr-only` class uses clip/offset, not `display:none`.
+- Findings discovered during execution: (1) the §9.6 tab order (… textarea → Send → Retry) requires the composer to precede the message list in the DOM, since Retry lives on the failed response in the list; it is also placed first visually, so no CSS reordering splits visual order from reading order. (2) No stylesheet file is in scope and `index.html` may change only its title, so `App` renders the `.sr-only` rules as a `<style>` text child. (3) The INC-08 note is honored: a conversation loads only on a selection change, tracked synchronously so React StrictMode's double mount cannot load it twice. (4) Browser automation was unavailable in the session, so the manual in-browser keyboard smoke and console check were replaced by a jsdom keyboard-only smoke of the real app plus real `dev:web`/API servers; the literal in-browser pass remains for independent review. (5) Independent real-browser review found that a delayed send error from an old conversation, released after a new conversation was created, was shown in the new one. Every selection change (select, NOT_FOUND deselect, create) now bumps a selection generation, and send/retry/load results are dispatched only while the generation is unchanged, which also rejects A → B → A. Retained network-failure send keys are scoped per conversation. (6) The same review saw `favicon.ico` return 404, so `index.html` gained `<link rel="icon" href="data:," />`. This is a narrow deviation from its title-only scope, adds no asset file, and changes no behaviour.
 
 ### INC-10 — Tests: unit layer
 
@@ -142,6 +143,7 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 
 - Files: `apps/web/src/components/*.test.tsx`, `apps/web/src/state/ChatProvider.test.tsx`, `apps/web/src/hooks/useResponseStream.test.ts`.
 - Spec: §6.5, §9.2, §9.3, §9.6, §10.
+- INC-09 review carry-forward: commit regression tests for delayed send/retry errors after selection changes; stale send/load callbacks across A → B → A; unchanged draft/sending state in the newly selected conversation; conversation-scoped retained send keys (reuse within A, fresh key for the same text in B); and StrictMode/URL selection without duplicate loads or response reseeding. Temporary probes are evidence only, not substitutes for these tests. Wait for terminal status before beginning a next send; full-looking delta text is not completion. Cover the §6.5 bounded reconnect/backoff policy and cancellation on selection/unmount in the hook tests.
 - Named tests: "create → send → ordered deltas → completed message" (AC-002); "refresh mid-stream restores selection from `?c=` and resumes without duplicate messages or deltas" (AC-013); "network / API error / validation error / provider failure each produce a distinct announced state with one usable next action" (AC-018); "`<img src=x onerror=…>` renders as text, `querySelector('img')` is null" (AC-020); "keyboard-only create → select → send → observe status → retry" with `user-event` `tab()`/`keyboard()` only (AC-022); "retry click issues one retry request and does not duplicate the user message" (FR-008).
 - Exit: `npm test` green; `fetch` is stubbed in every test, no real network, no `EventSource` polyfill.
 
