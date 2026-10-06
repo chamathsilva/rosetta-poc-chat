@@ -269,6 +269,50 @@ The literal `npm run dev:api` plus `npm run dev:web` path was also checked with 
 
 Preserved review, raw validation output and parameterized snapshots of the temporary probes are in the independent evaluation repository under `evidence/EXP-002/INC-09-REVIEW.md`, `INC-09-VALIDATION.md` and `validation/inc09/`. Parameterization replaced only the local checkout path. INC-13 now explicitly carries the async-selection/key-scoping regression cases. The evaluator observed a development-only Vite Fast Refresh fallback to full reload while editing the provider's mixed exports; no seamless-HMR claim is made.
 
+### 2026-10-01 | execution-context | INC-10 unit-test layer validated; stopped at commit-ready
+
+INC-10 ran from committed INC-09 (`3396ed86ea3178a5950e211b9cb71e4103e717e1`) on Claude Code `2.1.285`, model `opus-5-5`, medium effort, in manual approval mode with the existing accounts. Every runtime command ran under Node 24.21.0 / npm 11.6.2. A human interruption occurred during the run. Work resumed on 2026-10-01 with an explicit request to stop at commit-ready. Elapsed wall-clock time is not used as productivity evidence.
+
+Earlier in the run, one read-only `node -e` version probe was issued without the pinned PATH export. The evaluator rejected it before it ran, and it was re-issued correctly. Every later runtime command exported the pinned PATH inside its own call.
+
+**Added: 14 test files, no product changes, no new dependencies.**
+- Shared: `contracts`, `params`, `normalize`, `title`, `terminal`.
+- API: four `domain/*` files, `http/error-envelope`, `http/logging`, `provider/deterministic-provider`.
+- Web: `state/chat-reducer`, `api/sse-client`.
+
+**Named INC-10 cases, all present.** Expected values are written out independently from SPECS; none are computed by the code under test.
+- **AC-003:** identical normalized input gives byte-identical provider payloads across instances and response ids. A purity check makes clock, random and crypto calls throw.
+- **AC-012:** the §6.3 five-row table at the parser boundary. Row 4 (out of range) is asserted as the parser returning `ok`; the 400 itself is the route's decision and is scheduled for testing over the real route in INC-12.
+- **AC-019:** whitespace-only, 4000, 4001, and 4000 vs 4001 surrogate-pair code points.
+- **AC-021:** the four redaction fixtures, plus logging content absence. The logging case runs the real `buildServer` and captures pino output at the `fs` layer. It asserts that at least two lines were captured, so a vacuous pass is impossible, and that no line contains any 4-character substring of the content.
+- **AC-013:** a replayed `seq ≤ lastAppliedEventId` returns the same state reference, together with an active-seed replay that yields the text exactly once.
+
+Further boundaries covered:
+- all 16 response-status transitions and the append guards;
+- order-sensitive `classifyRetry` cases;
+- NFC vs NFD idempotency conflict, corrected after independent review so it uses the same accented text in both forms and asserts the fixtures differ;
+- the fixed HTTP status map;
+- every reducer action and the §9.6 announcement table, run over deep-frozen inputs;
+- SSE framing with one byte per chunk, corrected after review so every multi-byte sequence is provably split;
+- invalid payloads, non-2xx mapping, abort, a non-abort mid-body read failure, and a null 200 body.
+
+**Explicit exclusions and limits:**
+- A consumer callback that throws (`onEvent`) is not unit-tested. The client deliberately rethrows to the caller, which Vitest reports as an unhandled error; INC-08's live validation exercised that path. Callback-error coverage is therefore not claimed to be complete.
+- These are unit tests only. They do not establish integration, SSE-route, restart or UI-component behaviour (INC-11 to INC-13), and they do not complete EXP-002 or any broader acceptance criterion on their own.
+
+**Corrections during the run, all to test code only:**
+- an over-reasoned reducer dedupe expectation, replaced by separate id-dedupe and same-content-different-id cases;
+- a miscounted UTF-8 byte literal (18, not 19);
+- an off-by-one provider chunk count.
+
+None exposed a product bug.
+
+**Results.** `npm test` exit 0 and `npm run check` exit 0, each captured without a masking pipeline: 14 files, 271 tests. Run per project: node 12 files / 199 tests (exit 0) and web 2 files / 72 tests (exit 0). `git diff --check` exit 0. The evaluator independently reproduced the same counts and exits. Nothing was staged, committed or pushed.
+
 ## Deferred items carried from `docs/TODO.md`
+
+### 2026-10-05 | publication-context | INC-10 checkpoint resumed
+
+The author requested continuation after the commit-ready stop. The evaluator reran `npm run check` using Node 24.21.0/npm 11.6.2: exit 0, 271 tests/14 files, strict typechecking and production build passed. Only the reviewed unit tests and their plan/log are included in this checkpoint; no account, permission, dependency or product changes. Exact commit and remote verification are recorded in the independent evaluation repository. INC-11 has not executed yet.
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)
