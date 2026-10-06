@@ -1,6 +1,6 @@
 # chat-poc — Execution Plan (HOW)
 
-Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-10 are validated. INC-10 publication resumed on 2026-10-05 after the author's continuation request; INC-11 starts only after its checkpoint is published and verified. Publication checkpoints are recorded in the independent evaluation repository. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
+Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-10 are independently validated and published. The verified INC-10 implementation checkpoint is `e8404451f6a922cd8dcacad0662d40cd059cc5b6`; the 2026-10-06 refinement changes planning only. INC-11 is next and has not started. Publication checkpoints are recorded in the independent evaluation repository. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
 15 increments: `INC-00` … `INC-14`. `INC-00`..`INC-09` are Phase 7 (implementation), `INC-10`..`INC-13` are Phase 11 (tests), `INC-14` is evidence close-out.
 
 ## Read first (every increment)
@@ -23,6 +23,8 @@ Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-1
 7. `apps/web` never imports `apps/api`; `domain/*` and `domain-rules/*` import nothing — SPECS §2.
 8. Every increment ends green on its own exit check. A red exit check blocks the next increment.
 9. Every command, install, build, and test runs under exactly Node `24.21.0`; a different active Node version is a blocked preflight, not an acceptable substitution.
+10. Pin the runtime PATH in each runtime command, including child-process launches; verify npm `11.6.2`. Capture the actual command exit status without masking pipelines, retain failed runs and corrections, and map each named test to its criterion and committed test path. The 271 tests accepted at INC-10 must continue to pass; report additions separately and explain any changed or removed assertion.
+11. Synchronize asynchronous integration tests with explicit provider/test signals and terminal status; use controlled timers where appropriate, not arbitrary sleeps as proof of completion. Validate fixtures independently of the implementation. Use `try/finally` or test teardown to settle owned work, close containers/connections, restore timers and remove only the test's own disposable files, including on failure.
 
 Outcomes, findings and deviations are recorded in `docs/experiment/EXPERIMENT-LOG.md`; FR/AC evidence is recorded in `docs/experiment/EVIDENCE-MAP.md`. Both were created during planning and are finalized/updated in INC-14. Phase status stays in the orchestrator's ephemeral workflow state.
 
@@ -122,7 +124,8 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 
 - Files: `packages/shared/src/**/*.test.ts` (contracts, normalize, title, terminal, params), `apps/api/src/domain/*.test.ts`, `apps/api/src/http/error-envelope.test.ts`, `apps/api/src/provider/deterministic-provider.test.ts`, `apps/api/src/http/logging.test.ts`, `apps/web/src/state/chat-reducer.test.ts`, `apps/web/src/api/sse-client.test.ts`.
 - Spec: §10 (test data), §3.1, §3.2, §3.4, §3.5, §4.6, §6.3, §7.4, §9.4.
-- Named tests that carry an AC on their own: `deterministic-provider.test.ts` "identical normalized input ⇒ byte-identical payloads" (AC-003); `params.test.ts` five-row table (AC-012); `normalize.test.ts` whitespace-only / 4000 / 4001 / surrogate-pair cases (AC-019); `error-envelope.test.ts` four redaction fixtures (AC-021); `logging.test.ts` content-absence assertion (AC-021); `chat-reducer.test.ts` "replayed seq ≤ lastAppliedEventId returns the same state reference" (AC-013).
+- Named unit evidence contributing to ACs (integration obligations remain): `deterministic-provider.test.ts` "identical normalized input ⇒ byte-identical payloads" (AC-003); `params.test.ts` five-row table (AC-012); `normalize.test.ts` whitespace-only / 4000 / 4001 / surrogate-pair cases (AC-019); `error-envelope.test.ts` four redaction fixtures (AC-021); `logging.test.ts` content-absence assertion (AC-021); `chat-reducer.test.ts` "replayed seq ≤ lastAppliedEventId returns the same state reference" (AC-013).
+- Coverage limitation carried to INC-14: throwing `onEvent` consumer callbacks are excluded from the committed SSE unit suite. INC-08 live validation is separate evidence; do not claim complete automated callback-error coverage. An isolated subprocess test may close this gap if justified, with its result recorded explicitly.
 - Exit: `npm test` green; both Vitest projects report a non-zero file count.
 
 ### INC-11 — Tests: API integration + SQLite/restart
@@ -130,7 +133,9 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 - Files: `apps/api/src/http/routes/*.test.ts`, `apps/api/src/usecases/*.test.ts`, `apps/api/src/persistence/*.test.ts`, `apps/api/src/stream/recovery.test.ts`, `apps/api/src/bootstrap/shutdown.test.ts`.
 - Spec: §3.4a, §4.3, §4.4, §4.5, §5.2, §5.5, §5.6, §7.3, §7.5, §10.
 - Named tests: "injected fault leaves neither message nor response" (AC-006); "identical timestamps keep list and history order" (AC-007); "duplicate key returns original IDs, full `userMessage`/`response` objects, `runCount === 1`" (AC-008); "same key different content ⇒ 409 and zero stored change" (AC-009); "restart on the same file preserves all four tables" (AC-005); **"restart recovers a zero-event pending response to exactly `[response.started@1, response.failed@2]`, status `failed`"** and **"restart recovers a partial-stream response by appending exactly one `response.failed` at `maxSeq+1`, prior events and `partial_text` untouched"** — both replacing the single AC-014 test (user-directed correction 2026-09-27); "failing provider persists one failure event and keeps the user message + partial" (AC-016); "second retry returns the same replacement, one user message" (AC-017); **"sending while the conversation has an active response returns `409 RESPONSE_ALREADY_ACTIVE` with zero writes; re-sending the original active response's own `clientMessageId` still returns `202` with the original IDs"** (user-directed correction 2026-09-27); **"retrying a failed response while a different response in the conversation is active returns `409 RESPONSE_ALREADY_ACTIVE` with zero writes, while replaying an existing active retry still returns `202` with that replacement"** (execution-discovered correction, INC-05); **"`shutdown()` with a slow-but-not-hung provider run in flight aborts it, awaits its settle within `SHUTDOWN_TIMEOUT_MS`, then closes the DB with no `ERR_SQLITE_*`/unhandled rejection, and the aborted response ends up `failed`"** (user-directed correction 2026-09-27); **"`shutdown()` while an idle HTTP keep-alive connection is open closes that connection and exits inside the bound with code 0"** (execution-discovered regression, INC-07; pinned Node 24.21.0); "foreign origin gets no `access-control-allow-origin`, configured origin does" (AC-023); the §10 error-category table (AC-019).
-- Exit: `npm test` green; every test uses a fresh temp DB and `fakeClock`+`sequentialIds`.
+- Explicit §10 determinism case: in `apps/api/src/usecases/send-message.test.ts`, send the same normalized content through two independent containers, with separate fresh databases and identically initialized injected clocks and ID sequences. Wait for both terminal states, require a non-empty complete event sequence, and compare every persisted event's serialized `data` byte-for-byte (AC-003). Provider-chunk equality from INC-10 alone does not satisfy this case.
+- Restart/shutdown evidence: exercise an actual child-process stop and restart against the same disposable database file, as well as the two seeded recovery branches above. Use the real entrypoint and loopback idle keep-alive connection for bounded process-exit evidence; reconstructing a container alone does not establish process shutdown. Keep deterministic container assertions separate from real-clock process bounds and identify each in the evidence.
+- Exit: `npm test` green, including the existing 271 tests; integration tests use isolated databases, with `fakeClock`+`sequentialIds` wherever stable output is asserted. Record named cases, actual exits, failures/corrections and cleanup outcomes for independent review.
 
 ### INC-12 — Tests: SSE replay
 
@@ -149,11 +154,12 @@ Why first: every later increment's exit check runs `npm run typecheck`/`npm test
 
 ### INC-14 — Evidence, docs, close-out (runs alone)
 
-- Files: new `docs/experiment/EVIDENCE-MAP.md`, new `docs/experiment/EXPERIMENT-LOG.md`; edits to `docs/ARCHITECTURE.md` (Installed sections, A-007/A-011/A-012/A-013 facts), `docs/ASSUMPTIONS.md` (mark A-007/A-009/A-011/A-012/A-013 RESOLVED), `docs/CODEMAP.md`, `docs/TECHSTACK.md`, `docs/PATTERNS/*` if a new pattern emerged, `agents/IMPLEMENTATION.md`, `docs/TODO.md`.
+- Files: finalize/update existing `docs/experiment/EVIDENCE-MAP.md` and `docs/experiment/EXPERIMENT-LOG.md`; edits to `docs/ARCHITECTURE.md` (Installed sections, A-007/A-011/A-012/A-013 facts), `docs/ASSUMPTIONS.md` (mark A-007/A-009/A-011/A-012/A-013 RESOLVED), `docs/CODEMAP.md`, `docs/TECHSTACK.md`, `docs/PATTERNS/*` if a new pattern emerged, `agents/IMPLEMENTATION.md`, `docs/TODO.md`.
 - Spec: §13.
 - Covers: AC-025, AC-026, and the AC-015 obligation stated in §13.
 - Exit: in a separate disposable fresh clone/worktree created from the completed commit, run `npm ci && npm run check` under Node `24.21.0`; never clean the working checkout. `EVIDENCE-MAP.md` has a row for all 11 FRs and all 26 ACs with an implementation path and a test path; `EXPERIMENT-LOG.md` records every deviation, manual correction and deferral from INC-00..INC-13.
 - Must run alone: it touches shared living docs that every other increment may also want to read.
+- Preserve the INC-10 callback-error limitation unless later committed evidence closes it; distinguish unit, container-integration, real-process and manual observations in the final evidence map.
 
 ---
 
@@ -224,7 +230,7 @@ Spec sections are headings in `plans/chat-poc/chat-poc-SPECS.md`.
 | FR-011 | §7.4, §7.5 | INC-07 |
 | AC-001 | §8.1, §8.2, §8.3 | INC-00 (re-verified at INC-14 exit) |
 | AC-002 | §9.3, §9.6 | INC-09, INC-13 |
-| AC-003 | §3.5, §6.2 | INC-04, INC-10 |
+| AC-003 | §3.5, §6.2, §10 | INC-04, INC-10, INC-11 |
 | AC-004 | §4.1–§4.3, §4.6, §6.2 | INC-01, INC-06, INC-08 |
 | AC-005 | §5.1, §5.2 | INC-03, INC-07, INC-11 |
 | AC-006 | §5.5 | INC-05, INC-11 |

@@ -309,10 +309,16 @@ None exposed a product bug.
 
 **Results.** `npm test` exit 0 and `npm run check` exit 0, each captured without a masking pipeline: 14 files, 271 tests. Run per project: node 12 files / 199 tests (exit 0) and web 2 files / 72 tests (exit 0). `git diff --check` exit 0. The evaluator independently reproduced the same counts and exits. Nothing was staged, committed or pushed.
 
-## Deferred items carried from `docs/TODO.md`
-
 ### 2026-10-05 | publication-context | INC-10 checkpoint resumed
 
 The author requested continuation after the commit-ready stop. The evaluator reran `npm run check` using Node 24.21.0/npm 11.6.2: exit 0, 271 tests/14 files, strict typechecking and production build passed. Only the reviewed unit tests and their plan/log are included in this checkpoint; no account, permission, dependency or product changes. Exact commit and remote verification are recorded in the independent evaluation repository. INC-11 has not executed yet.
+
+### 2026-10-06 | planning-context | Integration and evidence refinements
+
+The author authorized the evaluator's plan refinements and a documentation commit. INC-10 is published at `e8404451f6a922cd8dcacad0662d40cd059cc5b6`; INC-11 has not started. The plan now explicitly assigns SPECS §10's cross-container event-data determinism assertion to INC-11 and maps it to AC-003. It clarifies controlled asynchronous synchronization, terminal-state waits, independent fixture checks, owned-resource cleanup, and real-process restart/shutdown evidence. Each runtime call retains the pinned Node 24.21.0/npm 11.6.2 environment; validation must preserve real exit statuses, failed runs and corrections, and the existing 271 passing tests.
+
+INC-14 will finalize the already-existing evidence documents and retain the throwing-consumer-callback coverage limitation unless later committed evidence closes it. These are evaluator-authored planning clarifications of existing contracts, not Claude implementation results or new acceptance criteria. No product, test, dependency, account or runtime configuration changed. This documentation revision is checked for diff hygiene and consistency; it does not constitute a new product test run.
+
+## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)
