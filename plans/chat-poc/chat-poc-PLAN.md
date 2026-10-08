@@ -1,6 +1,6 @@
 # chat-poc — Execution Plan (HOW)
 
-Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-10 are independently validated and published. The verified INC-10 implementation checkpoint is `e8404451f6a922cd8dcacad0662d40cd059cc5b6`; the 2026-10-06 refinement changes planning only. INC-11 is next and has not started. Publication checkpoints are recorded in the independent evaluation repository. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
+Status: implementation in progress on `experiment/EXP-002`; INC-00 through INC-10 are independently validated and published. INC-11 (API integration + SQLite/restart tests) has passed independent review, 364 tests/28 files, typecheck and build, and is ready for its publication checkpoint. INC-12 starts only after that checkpoint is pushed and remote-verified. Publication checkpoints are recorded in the independent evaluation repository. Ordered increments only. Contracts live in `plans/chat-poc/chat-poc-SPECS.md` and are referenced by section heading, never restated.
 15 increments: `INC-00` … `INC-14`. `INC-00`..`INC-09` are Phase 7 (implementation), `INC-10`..`INC-13` are Phase 11 (tests), `INC-14` is evidence close-out.
 
 ## Read first (every increment)

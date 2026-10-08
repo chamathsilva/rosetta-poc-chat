@@ -319,6 +319,80 @@ The author authorized the evaluator's plan refinements and a documentation commi
 
 INC-14 will finalize the already-existing evidence documents and retain the throwing-consumer-callback coverage limitation unless later committed evidence closes it. These are evaluator-authored planning clarifications of existing contracts, not Claude implementation results or new acceptance criteria. No product, test, dependency, account or runtime configuration changed. This documentation revision is checked for diff hygiene and consistency; it does not constitute a new product test run.
 
+### 2026-10-07 | execution-context | INC-11 integration tests: harness defect corrected, validated, stopped for final review
+
+**Host and process events — not Rosetta or product results.**
+- INC-11 started from the clean published target `f56d257570d9ff95a9a15e4bb24e3671d143245a`, inside the saved Rosetta coding-flow conversation, at Phase 11 (tests).
+- The previous terminal process was gone, so this saved conversation was resumed in a new manual-mode process. The evaluator's CLI version probe reported `2.1.283`, while the earlier evidence recorded `2.1.285`. That drift is recorded as observed; it is not normalized.
+- An unsolicited LSP installation prompt was declined ("No, not now").
+- Authentication was interrupted. After the user reauthenticated, a no-tool verification message confirmed the conversation could respond. Neither event is a Rosetta or product result.
+- Later the host went to sleep partway through the correction step. On resume, the disk was inspected first: every approved edit had landed, and none was duplicated.
+- The account, model/effort, Rosetta 3.1.13 plugin, empty MCP, disabled Chrome and manual one-time approvals were unchanged. Every runtime call exported `PATH=/Users/chamathwor/.nvm/versions/node/v24.21.0/bin:$PATH` (Node 24.21.0, npm 11.6.2). No dependency, configuration or product change was made.
+
+**Added: 14 test files, 93 tests.** The 271 accepted INC-10 tests are unchanged and still pass (no previously tracked test or product file modified; only the plan and experiment log are updated).
+
+| File | Tests | Covers | Evidence level |
+|---|---|---|---|
+| `persistence/schema.test.ts` | 4 | §5.2 shape, pragmas, idempotence; **AC-005** "restart on the same file preserves all four tables" | container, test-owned temp file |
+| `persistence/unit-of-work.test.ts` | 4 | §5.5 commit/rollback, Promise-returning fn rejected | `:memory:` |
+| `persistence/ordering.test.ts` | 1 | **AC-007** "identical timestamps keep list and history order" (+ reopen) | container, temp file |
+| `persistence/repos.test.ts` | 8 | all four unique indexes hold under raw SQL; seq allocation; §5.4 corrupt rows refused | `:memory:` |
+| `usecases/send-message.test.ts` | 13 | **AC-006** (faults at insert and at touch), **AC-008** (`runCount === 1`), **AC-009**, **AC-016**, §10 **AC-003** determinism across two containers, validation/lookup with zero writes | container, `fakeClock`+`sequentialIds` |
+| `usecases/retry-response.test.ts` | 5 | **AC-017** "second retry returns the same replacement, one user message"; retry rejections; retry gate | container |
+| `usecases/get-conversation.test.ts` | 3 | title rules, `activeResponse`, NOT_FOUND | container |
+| `stream/recovery.test.ts` | 4 | **AC-014** zero-event `[started@1, failed@2]` and partial-stream `failed@maxSeq+1` branches; idempotence; a recovered replacement is not retryable; a completed response is untouched | container, same-file reopen |
+| `http/routes/messages.test.ts` | 21 | §10 error-category table over HTTP (**AC-019**); happy data; idempotency over HTTP; the named one-active-response case | real `buildServer` via inject |
+| `http/routes/responses.test.ts` | 6 | retry over HTTP; the named retry-while-active / replay-active-retry case | real server |
+| `http/routes/conversations.test.ts` | 9 | §4.3 status codes; strict and malformed bodies; unknown route | real server |
+| `http/routes/cors.test.ts` | 8 | **AC-023** "foreign origin gets no access-control-allow-origin, configured origin does"; preflights; near-miss origins | real server |
+| `http/routes/health.test.ts` | 3 | health 200/503; draining per §7.5 step 1 | real server |
+| `bootstrap/shutdown.test.ts` | 4 | the named slow-but-not-hung drain (**container level**); **real process**: pinned binary, the named idle keep-alive SIGINT case, and a same-file restart with four-table byte-identical snapshots plus `recoveredResponses: 1` after a seeded interruption | container + child process of the built `dist/index.js` |
+
+Per-file counts were measured with Vitest's JSON reporter (`agents/TEMP/inc11/inc11-counts.json`: 93 tests, 14 files, all passed, exit 0). A first draft of this table had estimated `conversations.test.ts` at 8 tests; the measured count is 9.
+
+**Evidence-level separation.** Deterministic assertions use `fakeClock` + `sequentialIds` at container level. The real-clock bounds (drain duration < `SHUTDOWN_TIMEOUT_MS`, process exit < `SHUTDOWN_TIMEOUT_MS`) appear only in `shutdown.test.ts` and are labelled there.
+
+The real-process tests first build the API project with the repository's own `tsc -b`, on the same pinned Node binary, because `npm test`'s `pretest` builds only the shared package. They then spawn `process.execPath dist/index.js` with an explicit environment: the pinned binary directory on PATH, plus only the five §7.1 variables. The test never reads `process.env`. Readiness and terminal states are explicit signals: a successful `/health`, and `activeResponse === null`. In-process runs are awaited through the container's §7.5 registry promises.
+
+**Failures and corrections, all retained.** Logs are under the git-ignored `agents/TEMP/inc11/`.
+1. `run-shutdown-1.log` (exit 1; 1 failed, 3 passed): the keep-alive test hung until its 60 s timeout. Independent review identified the cause as a **test-harness defect, not a product finding**. A promise resolved with another promise assimilates it, so the test awaited socket closure before it ever sent SIGINT.
+   - Corrected: the close observer is now returned inside an object.
+   - A throwaway diagnostic, `keepalive-diagnose.mjs`, was written but **not executed**. Review found it lacked owned-resource cleanup on failure, and it stays unexecuted.
+2. Review also required:
+   - an owned-resource cleanup stack in `shutdown.test.ts`, with every resource registered on creation: children killed and their exits awaited, agents and sockets destroyed, runs aborted and settled, the slow fixture's timer cleared, databases closed, and temp directories removed last;
+   - release plus abort of gated runs in teardown in `send-message`, `retry-response`, `get-conversation` and `routes/messages` (`routes/responses` already released at setup and now also aborts);
+   - non-empty, byte-identical snapshots of all four tables, read from the file before stopping run 1 and after the real restart into run 2;
+   - a real persist-before-publish assertion for AC-016: the database is read inside the intercepted `publish`.
+
+   After these corrections, `run-shutdown-2.log` exited 0 (4 passed).
+3. `gate-*.log`: the first full gate failed (`npm run typecheck` and `npm run check` exit 1, `npm test` exit 0). The cause was a test-only type error, `Parameters<…>[1]["provider"]` on an optional parameter; Vitest does not typecheck. It was corrected to `ContainerOverrides["provider"]`.
+
+Earlier self-corrections, before their respective scoped runs: `repos.test.ts` was rewritten to remove `as never` casts and dead lines, and a fabricated status-flip fixture in `retry-response.test.ts` was replaced with a genuinely gated active run.
+
+**Final gate (`gate2-*.log`), exits captured without pipelines:**
+- `npm run typecheck`, `npm test`, `npm run check` and `git diff --check`: all exit 0;
+- `npm test` and `npm run check`: 28 files, 364 tests each;
+- vitest node project: 26 files / 292 tests, exit 0;
+- vitest web project: 2 files / 72 tests, exit 0.
+
+**Cleanup outcomes:** no test temp directories (`chat-poc-XXXXXX`) remained, no `dist/index.js` process survived, and no loopback listener was left. The git-ignored `apps/api/dist` is rebuilt by the process tests as normal build output.
+
+**Limits.** These are API integration and restart tests only. SSE replay over the real route (INC-12) and React components (INC-13) are not covered here. The INC-10 throwing-callback limitation is unchanged. Nothing was staged, committed or pushed, and INC-12 has not started.
+
+### 2026-10-07 | independent-review-context | INC-11 accepted for checkpoint publication
+
+The evaluator independently read all 14 new test files against the approved plan, verified that fixed requirements, acceptance criteria, dependencies, configuration, product code and all existing unit tests were unchanged, and ran `npm run check` under Node 24.21.0/npm 11.6.2. Exit 0: strict typechecking, 364 tests in 28 files, and production build passed.
+
+A separate disposable-copy probe deliberately threw immediately after four provider gates and one idle keep-alive socket became active. It exited 1 with exactly five intended synthetic failures, 41 skipped tests and no hook timeout or unhandled error. No test-owned database directory or API process remained afterward. These are evaluator-authored fault injections into a copy, not product changes, additional committed tests or product failures. The experiment checkout was untouched by the probe.
+
+Acceptance covers INC-11 only. Host resume and two sleep-error interruptions do not establish clean-clone recovery. The ignored `agents/TEMP/chat-poc/coding-flow-state.md` ledger remains stale (Phase 7/INC-00 and Phase 11 pending); tracked plan/log progress is not proof of complete Rosetta phase conformance. The ledger was deliberately left unchanged, as directed earlier. No lint command ran; diff hygiene, typecheck, tests and build are the validated gates.
+
+Initial and corrected failure/passing output, independent check and cleanup probe are preserved publicly in the separate evaluation repository under `evidence/EXP-002/validation/inc11/`, with review in `INC-11-REVIEW.md`. This checkpoint includes only the 14 owned tests and plan/log. Chamath remains Git author/committer; no account configuration changed. Exact target commit and remote verification are recorded there after publication. INC-12 SSE replay tests, INC-13 UI regressions and INC-14 fresh-checkout close-out remain.
+
+### 2026-10-08 | publication-context | INC-11 validation refreshed
+
+Before publication after the day boundary, the evaluator reran pinned `npm run check`: exit 0, typecheck, 364 tests/28 files and build passed. The previously reviewed test files were unchanged. GitHub authentication still reports `chamathsilva`; the target SSH origin and author/committer configuration remain Chamath's. This commit contains only the accepted 14 tests and plan/log updates. Exact commit and push verification live in the separate evaluation review; no INC-12 execution or whole-case-study acceptance is claimed.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)
