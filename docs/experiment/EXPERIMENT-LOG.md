@@ -393,6 +393,41 @@ Initial and corrected failure/passing output, independent check and cleanup prob
 
 Before publication after the day boundary, the evaluator reran pinned `npm run check`: exit 0, typecheck, 364 tests/28 files and build passed. The previously reviewed test files were unchanged. GitHub authentication still reports `chamathsilva`; the target SSH origin and author/committer configuration remain Chamath's. This commit contains only the accepted 14 tests and plan/log updates. Exact commit and push verification live in the separate evaluation review; no INC-12 execution or whole-case-study acceptance is claimed.
 
+### 2026-10-08 | execution-context | INC-12 SSE replay tests: interruptions, a coverage finding, validated, stopped for final review
+
+**Host and process events — not Rosetta or product results.**
+- INC-12 started from published INC-11 `a50aa08548c903e3628cff7889988823bb42863e`, in the same saved conversation and the same checkout.
+- From inside the session: the model is Opus 5.5 (`claude-opus-5-5`); the effort level is not observable; the permission posture is manual one-time approval. No `claude` binary was on the shell's PATH, so the host version could not be read from inside the session. The evaluator reported that the installed and running host became `2.1.287` after a process restart. This is recorded as further host drift (earlier records: `2.1.283`, `2.1.285`) and is not normalized.
+- **Blocked attempt.** The first `hub.test.ts` Write failed with `EPERM: operation not permitted` on `apps/api/src/stream`. The pending `runner.test.ts` Write was then rejected to stop further operations. Independent inspection found no partial files and a clean target; the old process ended during the interruption, and a fresh process resumed the same conversation.
+- The rejected `runner.test.ts` draft contained a test defect, `await c.startRun(...)` on a `void` function; it was corrected when the write was repeated.
+- **Two host sleeps** ("API error") followed, after `hub`/`runner` and after `subscribe` were written. Each resume preserved the files on disk and their results.
+- **One validation command was cancelled before approval.** After a terminal redraw, the safety reviewer could not inspect the full compound gate command. That was approval handling, not a test failure. Validation was re-issued as short separate commands.
+- **Two per-project recount commands** (vitest `--project node` / `--project web`) were cancelled before execution. They produced no test results, none are claimed, and no more precise cause is recorded.
+
+The account, Git identity, Rosetta 3.1.13 plugin, strict empty MCP, disabled Chrome, and Node 24.21.0 / npm 11.6.2 pinned per call were unchanged. No product, dependency, contract or settings change was made, and no lint tool was run.
+
+**Added: 5 test files, 47 tests, measured with the JSON reporter.**
+
+| File | Tests | Covers |
+|---|---|---|
+| `stream/hub.test.ts` | 7 | routing by response id (FR-005), unsubscribe, self-unsubscribe during publish, dropping a throwing subscriber, `closeAll` |
+| `stream/runner.test.ts` | 6 | **AC-010** "seq 1..n, one start, one terminal, nothing after terminal"; persist-then-emit for each publish after the test subscribes (the `response.started` publish happens synchronously inside `sendMessage`, before subscription, so it is not observed here; INC-11 covers start ordering separately); error chunk, thrown error, missing end chunk and abort each give exactly one `response.failed` |
+| `stream/subscribe.test.ts` | 8 | **AC-011** "reconnect at mid-stream replays only later events, concatenated deltas contain no repeat, then continues live"; active-stream buffered de-duplication; "reconnect on a terminal response replays then closes"; "`Last-Event-ID === maxSeq` on a terminal response closes with zero frames"; "synchronous backfill/read or sink/write failure detaches the buffering subscriber before rethrow" (read, write and terminal-check failures; subscriber count observed); live write failure; detach and `closeAll`; live isolation |
+| `http/sse.test.ts` | 8 | exact §6.1 framing (one data line, JSON-escaped); fixed headers and constants; "heartbeat frames carry no `id:`" (fake `setInterval` only, loopback socket); CORS headers carried onto the hijacked reply; disconnect detaches once and clears the heartbeat; attach failure after headers drops the connection |
+| `http/routes/response-events.test.ts` | 18 | the five §6.3 rows over the real route (**AC-012**), with both 400s returned as JSON envelopes rather than SSE; `maxSeq` zero frames; AC-010 frame shape; 404/400; "a stream for response A never yields a frame for response B" (**FR-005**); a live replay-to-live reconnect over a loopback socket |
+
+**Failures, corrections and findings, all retained** in the git-ignored `agents/TEMP/inc12/`:
+1. `run-sse-1.log` (exit 1; 3 failed, 5 passed). A **test-harness defect**: the harness waited for response headers before anything had been written, but Node's `writeHead` only buffers headers until the first body write. Corrected by writing a frame or heartbeat first (`run-sse-2.log`, exit 0). One observation is recorded **without any product change**: a client attached to a stream with nothing to replay receives no headers until the first event or heartbeat. SPECS §6.1 does not require an earlier flush.
+2. **Coverage finding from independent review (test strength PARTIAL).** In a disposable copy, the evaluator removed only `event.seq <= maxSent` from the deliver guard in `attachResponseStream`, and all 47 INC-12 tests still passed. The original buffered-dedup test replayed a **completed** stream: the backlog's terminal frame set `ended` before the buffer was flushed, so the sequence guard was never exercised. The test was replaced. It now uses an active, non-terminal backlog (seq 1–3), overlapping buffered publications (seq 2 and 3) landing during the synchronous backfill, and then live `delta@4` and `completed@5` on the real repository and hub. It asserts the exact ids `[1, 2, 3, 4, 5]`, the full text exactly once, and that the stream is still open after the flush (`run-subscribe-2.log`, exit 0). Claude Code did not re-run the mutation check, because that needs a product edit in a disposable copy. **Evaluator evidence, not a Claude Code run:** with the strengthened test, the evaluator re-ran the same duplicate-guard mutant in the disposable copy. It now fails exactly the active-overlap assertion, `[1, 2, 3, 2, 3]` against the expected `[1, 2, 3]` (exit 1; 1 failed, 7 passed; no cleanup timeout). The unchanged product passes all 8 strengthened `subscribe` tests. The original PARTIAL test-strength judgment stands as the finding for the test as first written.
+3. A self-review cast (`as never`) in `sse.test.ts` was replaced with schema parsing. This happened after the SSE targeted validation runs (`run-sse-1.log`, `run-sse-2.log`) and before the combined targeted run and the final gates.
+
+**Validation:**
+- First gate: `gate-typecheck.log` exit 0; `gate-npm-check.log` exit 0 (33 files / 411 tests, build OK); targeted five files exit 0, 47 tests (`inc12-counts.json`).
+- After the correction: targeted five files exit 0, 47 tests (`inc12-counts-2.json`); `npm run check` exit 0, 33 files / 411 tests, build OK (`gate2-npm-check.log`); `git diff --check` exit 0. The 364 tests that existed before INC-12 are unchanged; no tracked test file was modified.
+- Cleanup check, inspection only: no entrypoint processes, no node loopback listeners.
+
+**Limits.** SSE stream tests only; React components (INC-13) are not covered. The ignored workflow ledger was not repaired, and full phase conformance is not claimed. Nothing was staged, committed or pushed, and INC-13 has not started.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)
