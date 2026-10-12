@@ -1,0 +1,567 @@
+# Experiment Log (AC-026)
+
+Purpose: record every missed requirement, manual correction, unexpected change, or deliberately deferred item during `EXP-002`, per `docs/CONTEXT.md` Experiment Rules and the Completion rule in `docs/ACCEPTANCE-CRITERIA.md`. Append-only; one h3 entry per event, in chronological order. Never edit a past entry's facts — add a follow-up entry instead.
+
+Style: `### <YYYY-MM-DD> | <category> | <one-line summary>`, body = what happened, why, and the resulting state. Category is one of `missed-requirement`, `manual-correction`, `unexpected-change`, `deferral`.
+
+## Entries
+
+### 2026-09-27 | unexpected-change | Stray permission-menu input during INC-00 checkpoint review
+
+A bare `4` arrived mid-turn while the orchestrator was inspecting git status/config/remote for the INC-00 checkpoint, with no pending question from the assistant it could answer. Treated as unintentional (e.g. stray terminal/menu input) and not acted on; flagged to the user, work continued on the directed checkpoint task.
+
+### 2026-09-27 | unexpected-change | INC-01 stopped before writing any file, to honor "INC-00 must land alone"
+
+User directed: land and checkpoint (commit + push) INC-00 alone before INC-01 starts, per `plans/chat-poc/chat-poc-PLAN.md` governing rule 8. The orchestrator had already dispatched an engineer subagent for INC-01; it was still reading spec sections and had written no files under `packages/shared/src`. Stopped via `TaskStop` before any write. `git status` confirmed no `packages/shared/src` changes existed at stop time. INC-01 will be redispatched fresh after the INC-00 checkpoint is committed and pushed, and the push is verified against the remote.
+
+### 2026-09-27 | manual-correction | INC-00 implemented and independently verified
+
+INC-00 (seed toolchain fixes — `plans/chat-poc/chat-poc-PLAN.md` INC-00, `plans/chat-poc/chat-poc-SPECS.md` §8.1-§8.3) implemented by an engineer subagent, all commands under pinned Node 24.21.0. Orchestrator independently re-ran a clean-tree `npm run check` (exit 0, zero product tests present) and reviewed every changed file's diff line-by-line against SPECS §8.1/§8.2/§8.3 — no deviation found. `AC-001` marked `Passed` in `docs/experiment/EVIDENCE-MAP.md` with the exact file list as evidence.
+
+Follow-up (same day, after this entry was first written): committed standalone as `a20c0bb` on `experiment/EXP-002` (parent `e16cb0a`, the planning checkpoint), pushed to `origin/experiment/EXP-002`, and independently verified via `git ls-remote origin refs/heads/experiment/EXP-002` — remote tip `a20c0bbedd518154fb343556e9bd9e84b056ab2c` matches local HEAD exactly. No other increment's files were included in this commit.
+
+### 2026-09-27 | manual-correction | title.ts had an intra-layer import; SPECS §2 requires domain-rules/* to depend on nothing
+
+INC-01's first draft of `packages/shared/src/domain-rules/title.ts` imported `codePointLength` from `./normalize.ts` (both zero-IO, zero-zod) to avoid duplicating code-point-counting logic, reasoning this satisfied SPECS §2's "no zod, no IO" wording. User rejected: SPECS §2 says `domain-rules/*` "depend on nothing," full stop, and the plan's governing rules 1-2 keep the approved layout fixed and make SPECS the contract source, not to be re-decided mid-implementation — even to relax an ambiguity in the requester's favor.
+
+Fix: `title.ts` now has a private, unexported, file-local `titleCodePoints` helper (`Array.from`-based) instead of importing from `normalize.ts`. Zero imports confirmed via `grep -n "^import" packages/shared/src/domain-rules/*.ts`. Small, accepted duplication of a two-line code-point-counting expression between `normalize.ts` and `title.ts`, traded for literal compliance with a fixed spec rule rather than an orchestrator-favorable reinterpretation of it. Re-ran the full INC-01 exit check afterward — still green.
+
+### 2026-09-27 | manual-correction | INC-01 contract surface was incomplete; execution-discovered spec gap (health.ts)
+
+User-led independent review of the completed INC-01 work found the "all 7 contracts files" claim in the subagent's report (echoed into `docs/experiment/EVIDENCE-MAP.md`) was inaccurate: only 6 files existed. Audit of every schema/body explicitly named (via `xSchema = ...`) in `chat-poc-SPECS.md` §4.1-§4.3 and §4.6 against actual exports found 3 gaps:
+
+1. `createConversationRequestSchema` (§4.3, `POST /api/conversations`) — missing. Fixed: added to `contracts/conversation.ts` (§2.1 already said this file holds "create/list bodies").
+2. `retryAcceptedSchema` (§4.3, `POST /api/responses/:responseId/retry`) — missing. Fixed: added to `contracts/response.ts` (natural fit, response-retry-related).
+3. `healthResponseSchema` (§4.3, `GET /health`) — missing, and unlike the other two, no existing file in the fixed §2.1 layout (conversation/message/response/events/errors/params) fits it without stretching that file's stated scope.
+
+For (3), the orchestrator's first instinct was to place it in the existing `contracts/errors.ts` to avoid touching the fixed module layout (plan governing rule 1). The user explicitly overrode this and gave direct orchestrator approval to add a 7th module instead — judged the cleaner root-cause fix, and the one that reconciles the SPECS TLDR's pre-existing "7 files" line (which was correct all along; the §2.1 layout *tree* was the buggy, incomplete part, missing a `contracts/health.ts` row).
+
+Resolution: created `packages/shared/src/contracts/health.ts` (`healthResponseSchema`), barrel-exported it, updated `chat-poc-SPECS.md` §2.1's layout tree to list `contracts/health.ts`, and updated `chat-poc-PLAN.md` INC-01's file list to include it and name all three previously-missing schemas explicitly. Full INC-01 exit check re-run after all three additions — still green (see below).
+
+This is an execution-discovered specification correction (the fixed §2.1 layout was itself incomplete, not something INC-01 mis-implemented against a correct spec), authorized by the orchestrator per the user's explicit direction, not a unilateral spec change.
+
+### 2026-09-27 | manual-correction | Three §4.3 response bodies were left unnamed; found missing on a further independent pass
+
+A second independent review pass (user-led) found the orchestrator had stopped short: `chat-poc-SPECS.md` §4.3 gives 5 request/response bodies an explicit `xSchema = ...` name in its table, but leaves 3 response shapes inline/unnamed — `POST /api/conversations` success (`{ conversation }`), `GET /api/conversations` success (`{ conversations: ConversationSummary[] }`), `GET /api/conversations/:conversationId` success (`{ conversation, messages, responses, activeResponse }`). The orchestrator's earlier reasoning — that "unnamed in the table" meant "not required as a shared schema" — was wrong: SPECS §2.1 already said `conversation.ts` owns "create/list bodies" (response bodies, not just the one named request body), and AC-004/the §4 preamble ("Response bodies are parsed on the client as well as produced on the server") require a single shared definition for every body, not only the 5 the table happened to name.
+
+Fix: added `createConversationResponseSchema`, `listConversationsResponseSchema`, `getConversationResponseSchema` to `packages/shared/src/contracts/conversation.ts` (shapes exactly as SPECS §4.3 states; export names are an implementation choice, flagged in the file's own header comment for review since the spec text never assigned them names). `getConversationResponseSchema` required `conversation.ts` to import `messageSchema`/`responseSchema` — checked for import cycles first (`message.ts`/`response.ts` do not import `conversation.ts`; the dependency graph stays a DAG). Updated `chat-poc-SPECS.md` §4.3's table to show the three new names instead of bare inline shapes, so INC-06/INC-08 have an unambiguous name to import. Full INC-01 exit check re-run after this addition — still green.
+
+No new module was added this time (governing rule 1 untouched) — these three land inside `conversation.ts`, which §2.1 already designated for exactly this content.
+
+Follow-up (same day): INC-01 was committed standalone as `e3900d5` (`e3900d536d0ccc292b2134f8eafc74871705deca`) on `experiment/EXP-002`, pushed to `origin/experiment/EXP-002`, and independently verified with `git ls-remote`; the remote tip matched local HEAD exactly. The worktree was clean after the push. The plan header was then corrected from its stale pre-implementation status to record INC-00/INC-01 complete and INC-02 next.
+
+### 2026-09-27 | manual-correction | Five defects found by user-led review of chat-poc-SPECS.md/PLAN.md
+
+User reviewed `plans/chat-poc/chat-poc-SPECS.md`/`chat-poc-PLAN.md` directly (Phase 5, user-led) and identified 5 defects, all corrected before any implementation:
+
+1. **Send `202` returned IDs only.** `sendMessageAcceptedSchema` returned `{conversationId, userMessageId, responseId}`; a client had to make a follow-up `GET` to render anything. Fixed to `{conversationId, userMessage, response}` (full objects) — SPECS §4.3, §4.4.
+2. **`response.completed` event returned `assistantMessageId`+`text` only, not the full message.** Fixed to embed the full `assistantMessage` (Message row). Noted tradeoff: this reintroduces a `createdAt` field into the payload, so AC-003 byte-for-byte comparison now explicitly requires the same injected `Clock` across both compared runs (already true of every AC-003 test) — SPECS §6.2, §9.4.
+3. **Boot recovery assumed every active response already had a `response.started` event.** A response that crashed between insert and its first event (`status="pending"`, zero events) would violate `checkAppend`'s "seq 1 must be `response.started`" rule if `response.failed` were appended directly. Fixed: zero-event case atomically appends `response.started`(1) then `response.failed`(2); partial-stream case appends only `response.failed`. Two separate named tests planned (INC-11) — SPECS §5.6.
+4. **Nothing enforced one active response per conversation.** A second message could be sent while the first's response was still `pending`/`streaming`. Fixed: new DB partial unique index `ux_responses_one_active_per_conversation`, new domain gate `checkActiveResponseGate` (evaluated only after idempotency classification, so a replay of the send that owns the active response still succeeds), new `409 RESPONSE_ALREADY_ACTIVE` error code, composer disables Send while any response is active. Named test planned (INC-11) — SPECS §3.4a, §5.2, §5.5, §4.6, §9.6.
+5. **Shutdown aborted runners but never awaited their settle before closing the DB.** Risk: closing `node:sqlite` while an aborted runner's write is still in flight. Fixed: runner registry now holds `{controller, promise}` pairs; shutdown awaits `Promise.race([Promise.allSettled(...), delay(SHUTDOWN_TIMEOUT_MS)])` between abort and `db.close()`. Named test planned (INC-11, `bootstrap/shutdown.test.ts`) — SPECS §7.5.
+
+None of these map to a new/invented AC ID; each is tagged inline in SPECS/PLAN as "(user-directed correction, 2026-09-27)" and traces to the existing FR it serves. Plan remains **not approved** — still at Phase 5/6, no implementation started.
+
+### 2026-09-27 | unexpected-change | Run metadata and host-version drift (boundary protocol step 4)
+
+Per `docs/EXPERIMENT-BOUNDARY.md` EXP-002 protocol step 4. Values below are evidence-backed rather than inferred from display labels.
+
+| Field | Value | Basis |
+|---|---|---|
+| Claude Code version | external preflight `2.1.283`; interactive session header `2.1.274`, with an installed update/restart pending | command output plus interactive session header; the mismatch is retained as observed drift rather than normalized away |
+| Model | Sonnet 5 (`claude-sonnet-5`) | private native session transcript |
+| Reasoning configuration | `medium` | private native session transcript (`effort` field) |
+| Permissions / approval mode | not directly queryable this session; `.claude/settings.json` sets only `enabledPlugins`, no explicit permission mode. Observed: interactive approval required for Bash/tool calls this session (multiple prompts; at least one Bash call rejected by the user) | `.claude/settings.json` read + session observation |
+| Available tools | `Agent, Artifact, AskUserQuestion, Bash, Edit, ListAgents, Read, ReportFindings, ScheduleWakeup, SendFeedback, Skill, ToolSearch, Write` plus deferred (fetched via ToolSearch as needed): `ArtifactComments, ArtifactData, CronCreate, CronDelete, CronList, DesignSync, EndConversation, EnterPlanMode, EnterWorktree, ExitPlanMode, ExitWorktree, Monitor, NotebookEdit, PushNotification, RemoteTrigger, SendMessage, TaskOutput, TaskStop, WebFetch, WebSearch` | session tool listing |
+| Rosetta source commit | `35c65a046259700a63b4ba8281f711d34060563b` | frozen-release record in the independent-evaluation repository, cross-checked against its GOV-004 manifest |
+| Full `rosetta-claude` plugin version | `3.1.13` | `.claude-plugin/plugin.json` `"version"` field in the plugin cache dir, matches the cache path segment |
+| Plugin artifact | `core-claude-3.1.13-2026-09-15.zip`; SHA-256 `3fc9f6d10d879dfa5036378fbec1801cc69875b7ffea030f27d69eea6f4d7f1b` | frozen-release record in the independent-evaluation repository; the record documents release-API digest comparison and source-tree equivalence |
+| Native task transcript SHA-256 | `9b6de9fa5f883179c4afb4e44ef7308c32945fb3b9dbd1ed60cfd1180b151f64` | copied byte-for-byte into permission-restricted, ignored evaluation evidence; raw transcript is not published |
+
+The version mismatch is a study finding: the exact process that executed the planning run identified itself as `2.1.274`, while the separate preflight binary reported `2.1.283`. The session was not restarted mid-run because doing so would have changed the execution environment. Publication must report both values and avoid claiming that one silently substitutes for the other.
+
+### 2026-09-27 | manual-correction | Tracked specs/plan depended on gitignored `agents/TEMP/` content
+
+- What: `plans/chat-poc/chat-poc-SPECS.md` §2 and `plans/chat-poc/chat-poc-PLAN.md` (Governing rule 1, INC-04, "Read first" table) treated `agents/TEMP/chat-poc/architecture-notes.md` — the design-phase working notes — as the sole, non-repeated source for the approved module layout and the 6 key mechanisms (event IDs, terminal-once, persist-then-emit, `STREAM-INV-1`, atomicity, ordering-without-wall-clock).
+- Why this matters: `agents/TEMP/` is gitignored (`docs/ARCHITECTURE.md` "Ignored by git"). A tracked deliverable depending on it for load-bearing, non-duplicated content would not survive a fresh checkout — directly at odds with `docs/CONTEXT.md`'s GOV-004 requirement that a fresh session recover from committed artifacts only (AC-015), and with AC-025's requirement that evidence mapping be self-contained.
+- Correction: inlined the "Recommended layout" and "Key mechanisms" sections verbatim into `chat-poc-SPECS.md` new §2.1/§2.2 (the committed spec). Updated all four `agents/TEMP` references in `chat-poc-SPECS.md`/`chat-poc-PLAN.md` to cite `chat-poc-SPECS.md §2.1`/`§2.2` instead. `agents/TEMP/chat-poc/architecture-notes.md` now retains only the rejected-option (B, C) rationale and the risk log (R1–R9), which is legitimately session-scoped working material, not a contract.
+- Found during: Phase 5 (review_plan) pause, while adding traceability links for the resolved assumptions below, before any reviewer subagent or user sign-off on the plan.
+- Resulting state: no tracked file under `plans/` or `docs/` depends on `agents/TEMP/` for content; the one remaining `agents/TEMP` mention (`chat-poc-PLAN.md` line 26, "Phase status stays in `agents/TEMP/chat-poc/coding-flow-state.md`") is a pointer to orchestrator session state, not a contract dependency, and is expected to be ephemeral.
+
+### 2026-09-27 | manual-correction | Traceability links added for design-phase resolved assumptions
+
+- What: `docs/ASSUMPTIONS.md` entries A-002, A-003, A-008, A-010, A-014 were marked `[RESOLVED]` during Phase 3 (user_review_design) but carried no pointer to the test/coverage evidence that will verify them once implemented.
+- Correction: added a `Verified by:` line to each, citing the exact `chat-poc-SPECS.md` section and `chat-poc-PLAN.md` increment/named test (or, for A-014, stating no test applies — it is a tooling absence, not runtime behavior).
+- Resulting state: every resolved product/technical assumption now traces forward to a spec section and a planned test, closing the loop from decision to verification before implementation starts.
+
+### 2026-09-27 | manual-correction | Unpinned runtime probes were rejected
+
+- What: three proposed Node-based planning probes did not qualify the runtime as the required Node `24.21.0` and were denied at the approval boundary.
+- Why: this repository's experiment boundary pins Node `24.21.0`; allowing the host-default runtime would weaken reproducibility even for a planning-time probe.
+- Resulting state: the plan now makes the exact Node version a governing rule for every command, install, build, and test. No product implementation resulted from the rejected probes.
+
+### 2026-09-27 | unexpected-change | External scratch-path proposal was rejected
+
+- What: the session proposed using `/private/tmp` for scratch work during planning. The proposal was rejected because it placed evidence outside the experiment repository and its documented evidence boundary; whether the tool had created any transient scratch content before the approval prompt could not be established from the public artifacts.
+- Resulting state: no external scratch content is treated as evidence or as an input to the accepted plan. Only tracked repository artifacts and separately hashed private transcripts are authoritative.
+
+### 2026-09-27 | unexpected-change | Reviewer subagent did not complete within the bounded review window
+
+- What: a Rosetta-invoked reviewer subagent remained active without returning an actionable review during the bounded planning window and was interrupted.
+- Correction: the user-led review became the accepted review path; its five concrete findings and corrections are recorded above and in the specs/plan.
+- Resulting state: no claim is made that the subagent completed or independently approved the plan. This qualitative observation must not be converted into time, token, cost, or productivity claims.
+
+### 2026-09-27 | manual-correction | Unsafe or state-mutating verification proposals were removed
+
+- What: planning produced a `git clean -xdf` close-out command and a rejected index-manipulation proposal using `git add -N` followed by `git reset` solely to inspect untracked content.
+- Why: the clean command could delete user or evidence files, while index mutation is unnecessary for review and can disturb the accepted checkpoint.
+- Resulting state: final clean-checkout verification now runs in a separate disposable fresh clone/worktree, and review uses read-only diffs or explicitly stages only the files intended for the checkpoint commit.
+
+### 2026-09-28 | unexpected-change | First INC-02 implementation attempt was interrupted by host sleep
+
+The first resumed Claude Code run delegated INC-02 to the Rosetta engineer workflow, but the computer slept while it was running. On resume, the workflow watchdog reported no progress for its 600-second window and stopped the agent. Inspection confirmed that this attempt wrote no target-repository files. The implementation was restarted in a fresh Claude Code session. This is classified as a host/session interruption, not a Rosetta implementation failure, and no productivity inference is made from the watchdog duration.
+
+### 2026-09-28 | unexpected-change | Overlapping interactive prompts temporarily changed approval state and installed a host-side language server
+
+While restoring manual approval mode in the fresh session, overlapping Claude Code prompts caused input intended for one prompt to be consumed by another. The session briefly entered accept-edits/automatic and plan states, and a suggested `typescript-lsp` host-side tool was accepted. Manual approval mode was restored before the remaining scoped implementation. Repository inspection found no unrequested target-repository change from this prompt race; the language-server installation is a host-side change only. This observation is retained because approval UX is relevant to the independent workflow evaluation.
+
+### 2026-09-28 | manual-correction | INC-02 review closed two specification/configuration gaps
+
+Claude Code implemented API configuration, domain types/errors, pure decision modules and ports, then stopped before staging or committing. Independent review found two issues and corrected both before publication: (1) API Node ambient types were initially enabled by a file-local triple-slash directive because TypeScript 7 did not resolve `node:process`; the durable fix is now `"types": ["node"]` in `apps/api/tsconfig.json`, with the local directive removed; (2) `checkAppend` enforced first-event and terminal rules but allowed a second `response.started`, contradicting SPECS §6.2's exactly-one-start invariant. SPECS §3.2 and the implementation now return `already-started` for that case. The stale §2.1 `canRetry` label was also aligned to the implemented §3.4 `classifyRetry` contract.
+
+Validation under pinned Node 24.21.0 passed: full `npm run check`; all 16 response-status transition pairs; first/duplicate-start, delta-status and terminal append guards; idempotency, retry and active-response decisions; domain import-boundary grep; and `git diff --check`. The implementation was committed as `71ee630324f9b6b0db430f52e29bbecaca5940db`, pushed to `origin/experiment/EXP-002`, and the remote ref was independently verified to match.
+
+The repository record types required by SPECS §5.3 were not fully spelled out by field. The implementation chose column-derived `NewConversation`, `NewMessage`, `NewResponse`, `ResponseRecord`, `StreamEventData` and `PersistedEvent` shapes and documents the derivation next to each type. These choices remain subject to concrete adapter validation in INC-03 rather than being claimed as final evidence now.
+
+### 2026-09-28 | unexpected-change | INC-03 session recovered from a transient connection loss without repository loss
+
+The scoped Claude Code INC-03 run lost its connection once while responding. The same native session was resumed, manual approval mode remained in effect, and repository inspection showed the eight persistence files intact. No claim is made about the interruption's cause or duration, and it is not treated as a Rosetta failure or productivity measurement.
+
+### 2026-09-28 | manual-correction | Shell/Python rewrite proposal rejected; repository-local throwaway validation retained
+
+During INC-03, Claude Code proposed a Python heredoc to rewrite `conversation-repo.ts`. It was rejected at the approval boundary because the accepted execution protocol requires normal Edit/Write operations for source changes. Claude then made the change with its Edit tool. A throwaway exit-check script and check log were kept under gitignored `agents/TEMP/` inside the target repository, run under pinned Node 24.21.0, and removed after use; no external scratch path was accepted as experiment evidence. The exit script reported all 32 persistence checks passing, and the full `npm run check` exited 0.
+
+### 2026-09-28 | manual-correction | INC-03 resolved a dependency-rule contradiction and passed independent validation
+
+SPECS §2.2 said `persistence/*` could depend on `ports.ts` types only, while §5.3–§5.4 simultaneously required `EventRepo.append` to call the pure response guard and every read row to use shared/Zod schemas plus `PersistedRecordInvalidError`. The implementation necessarily exposed that contradiction. The rule was corrected narrowly: persistence may import the port interfaces, pure domain guards/errors/types, and shared/Zod validation schemas, but no transport or other outward IO layer. The provider boundary remains ports-types-only.
+
+Independent review inspected every new persistence file, confirmed the exact four tables and seven indexes, verified no executable `await`/`async`/promise scheduling inside persistence and no `lastInsertRowid` use, and re-ran `npm run typecheck`, full `npm run check`, and `git diff --check` under Node 24.21.0. A separate orchestrator-authored temporary smoke outside the repository verified schema idempotence and counts, Promise-return rollback, deterministic conversation/message/event ordering, idempotency rejection with zero extra rows, guarded event sequencing and terminal uniqueness, and close/reopen persistence. It passed and was not committed. INC-03 was committed as `ec2a2448348f6d330926c5d5dff18fea02aa3a73`, pushed, and the remote ref was independently verified to match.
+
+### 2026-09-28 | unexpected-change | INC-04's first long instruction paste was clipped
+
+The resumed Claude Code terminal accepted only the tail of the first detailed INC-04 instruction paste. No implementation was accepted on that ambiguous basis. A shorter corrective prompt explicitly restated the exact seven-file boundary, pinned Node version, manual approval mode, required checks, and stop-before-commit rule; Claude confirmed that scope before writing files. This is retained as an interaction finding, not attributed to Rosetta and not converted into a productivity claim.
+
+### 2026-09-28 | manual-correction | INC-04 review closed a failed-attachment subscriber leak
+
+Claude Code implemented the deterministic provider, provider doubles, response runner, live hub, replay/live subscriber and restart recovery within the accepted INC-04 boundary. Its 22-case throwaway exit check and full `npm run check` passed under Node 24.21.0, and the temporary repository-local check files were removed.
+
+Independent review then inspected all seven source files and re-ran the full check. A separate orchestrator-authored probe passed deterministic chunks, success completion, fixed/redacted provider failure, abort-to-`PROVIDER_INTERRUPTED`, persist-before-publish, zero-event recovery, partial-stream recovery, recovery idempotence, and replay/live deduplication. Review found one additional robustness defect: after installing the buffering subscription, a synchronous `listAfter` or sink-write exception could leave that subscriber registered. `attachResponseStream` now unsubscribes before rethrowing; a focused regression probe confirmed that publishing afterward reaches no leaked sink. SPECS §6.4 and INC-12's named-test list were updated so the correction remains part of the durable contract.
+
+The implementation checkpoint was committed as `2b8e3b4fffd5b28358889f0fe6da36c56d663f8b`, pushed to `origin/experiment/EXP-002`, and the remote ref was independently verified before this evidence follow-up. Two bounded implementation frictions remain documented without widening INC-04: `MessageRepo` has no `findById`, so completion re-reads the conversation to obtain the inserted assistant row; the provider port has no abort signal, so the runner races pending `next()` calls against abort and requests iterator return without awaiting it. Both are acceptable under the current deterministic/local provider boundary and will be re-evaluated during INC-07 shutdown wiring and INC-11 tests.
+
+### 2026-09-28 | unexpected-change | INC-05 instruction paste was clipped a second time
+
+The resumed native Claude Code session again received only the tail of a long scoped instruction paste. Claude recognized the clipping, recovered the task from the committed plan/spec, and stated the correct INC-05 boundary before writing. No work was accepted solely from the clipped prompt. This recurrence strengthens the workflow finding from INC-04: long interactive instruction pastes are not a dependable task-transfer channel; committed artifacts plus a short increment identifier are the safer recovery path. This is an interaction observation, not attributed to Rosetta and not converted into a productivity claim.
+
+### 2026-09-28 | manual-correction | INC-05 review extended the active-response gate to retry creation
+
+Claude Code implemented the five scoped use cases and stopped before staging or committing. Its 15-case repository-local exit smoke covered create/list/get payloads, normalization and limits, send idempotency/conflict/active gating, atomic injected failures, retry eligibility and replay, and post-commit provider-run start; static checks and the full pinned-Node gate passed, and throwaway files were removed.
+
+The exit probe also exposed a contract gap: retrying one failed response while a different response in the same conversation was active reached the database's `ux_responses_one_active_per_conversation` backstop and surfaced a raw SQLite uniqueness error. The one-active-response invariant applies to every newly created response, not only sends. The use case now applies `checkActiveResponseGate` only after `classifyRetry` returns `start`; `existing` replay still returns before the gate. SPECS §3.4a/§4.3/§4.5/§4.6 and the INC-05/INC-11 plan text were corrected so the API returns `409 RESPONSE_ALREADY_ACTIVE` with zero writes instead of an internal error.
+
+Independent review inspected all five source files, re-ran full `npm run check` under Node 24.21.0, and ran an 18-assertion real-SQLite smoke covering create/list/get, normalized send, full-object duplicate replay, conflict, new-send active gate, new-retry active gate, retry replay, row counts, post-commit run start, and read-model retry linkage. All passed. `MessageRepo` still lacks `findById`, so duplicate and retry paths re-read conversation history; this is recorded friction rather than widened scope. The implementation checkpoint was committed as `679f52247792a572087301fff063caaaeef404a5`, pushed, and the remote ref was independently verified to match.
+
+### 2026-09-28 | manual-correction | INC-06 supplied the missing fixed validation-message map and exposed an INC-07 startup-log requirement
+
+Claude Code implemented the HTTP/SSE transport and stopped before committing. The guided live-server run passed the endpoint status matrix, all five `Last-Event-ID` cases, exact SSE replay, malformed-body redaction, configured/foreign-origin CORS, active-response/retry paths, client-disconnect detach followed by terminal replay, draining behavior, and the structured log allowlist. Three corrections during that run belonged only to the temporary harness — quoting a zsh bracket glob, replacing GNU-only `cat -A` on macOS, and attaching the disconnect observer before abort — and did not require product changes.
+
+The transport needed the fixed Zod `issue.code` to public-message map already required by SPECS §4.6, but INC-01 had not created it. It was added to `packages/shared/src/contracts/errors.ts` during INC-06 and consumed by `http/error-envelope.ts`; received values are not echoed. This is recorded as a missed earlier contract item, not an invented transport behavior.
+
+Independent review inspected all ten changed files, re-ran the full `npm run check` under Node 24.21.0, and passed a separate 27-group probe over health/draining, strict/invalid JSON, strict unknown fields, invalid identifiers, unknown routes, configured/foreign-origin CORS, malformed/out-of-range event IDs, unknown-error redaction, log-field filtering, and exact SSE formatting. Implementation checkpoint `3d84946fc3e2ec58b2add574667245d6c1441097` was pushed and the remote ref matched exactly.
+
+Review also found a forward wiring risk: Fastify's framework-generated successful-listen message includes the bound URL in the free-text message. The structured-field formatter cannot remove text already embedded in `msg`, so INC-07 must suppress that message and emit only the explicit allowlisted recovery record. SPECS §7.4 and the INC-07 exit/trap text now make that requirement durable. The existing `DATABASE_UNAVAILABLE` mapping remains compatible with the contract: `/health` intentionally catches database-check failure and returns its non-enveloped health schema per §4.3; no claim is made that a health failure returns an error envelope.
+
+### 2026-09-28 | execution-context | Claude and Git identities intentionally remain separate
+
+The active native Claude Code session is authenticated through a separate Claude Pro account, while Git commits, GitHub authentication, repository ownership and pushes remain under Chamath. The evaluator explicitly directed that both configurations remain unchanged. At the time this was verified, native `/status` reported Claude Code `2.1.283`, model `claude-opus-5-5`, and medium effort; the earlier planning-run metadata above remains separately accurate for that earlier observation. This separation is recorded as execution context only: it does not imply a Rosetta association, does not change code authorship, and is not used as a product or productivity claim. The Claude account holder and exact account identifiers remain in the private native session evidence rather than being duplicated in the public repository.
+
+### 2026-09-28 | plan-refinement | INC-07 direct-bind shutdown dependency and temp-helper contract
+
+The INC-07 reviewer raised a potential shutdown risk because suppressing Fastify's successful-listen URL requires preparing Fastify and binding `app.server` directly. A bounded live probe held an idle keep-alive connection open, delivered `SIGINT`, and observed clean exit code 0 in 51 ms under pinned Node 24.21.0. The concern did not reproduce because Node 19+ `server.close()` closes idle connections. The direct bind is retained, but SPECS §7.4/§7.5 and PLAN INC-07/INC-11 now make the Node/Fastify version dependency and automated keep-alive regression explicit.
+
+The same review found that `temp-db.ts` legitimately uses `node:os.tmpdir()` as the root passed to `node:fs.mkdtempSync`, while SPECS §12's exhaustive built-in list omitted `node:os`. SPECS §10/§12 now allow that built-in for the test-helper temp root only. This is a specification omission corrected before publication, not a new dependency or an implementation deviation.
+
+Claude Code's guided checks also passed normal startup/health, same-file restart with both recovery branches, bounded drain, second-signal behavior, helper contracts, the exhaustive startup-log check, and the full repository gate. Independent review inspected all six implementation files, re-ran `npm run check` under Node 24.21.0, and ran a separate 12-assertion probe covering composition, recovery count, health, clock advancement, sequential UUIDs, invalid prefixes, drain state, database closure and temp cleanup. All passed. Implementation checkpoint `4aa99d7c9e21cf99f185799763288cac8584e8ee` was pushed and the remote ref was independently verified to match.
+
+### 2026-09-29 | execution-context | INC-08 resumed after an interrupted session
+
+The first INC-08 session ended while a throwaway validation script was being written, before any validation ran. On resume, inspection showed the five INC-08 source files and the two tsconfig edits intact, no leftover API process on port 8787, and an empty temporary validation directory: the script had never been written. The evaluator confirmed that the rejected temp-file call was caused by the interruption, not by a decision to skip validation. The resumed execution ran on Claude Code `2.1.284`, the version the evaluator identified for that session. A `claude --version` query issued during validation returned `2.1.285`, so the installed CLI binary had already moved ahead of the running session. Both values are retained, in the same way as the earlier version drift, and neither replaces the other. The Claude Pro account, manual approval mode, and Git settings were left unchanged.
+
+### 2026-09-29 | manual-correction | INC-08 needed Vite client types; review fixed three contract defects
+
+`apps/web/src/config/env.ts` must read `import.meta.env` (SPECS §7.2), but neither `apps/web/tsconfig.json` nor `tsconfig.test.json` loaded Vite's client types, so it could not typecheck. Both files belong to INC-00. Given the choice between a tsconfig change and a file-local reference directive, the evaluator chose the tsconfig change: `apps/web/tsconfig.json` gained `"types": ["vite/client"]`, and `tsconfig.test.json` now lists `["node", "vite/client"]`. PLAN INC-08 scope and ownership, and SPECS §7.2/§8.2, now record both files.
+
+A critical re-review against SPECS §6.5, §7.2, §8.1–§8.2 and §9.1–§9.4 found three defects in the uncommitted INC-08 code, all fixed before validation:
+1. `conversation/loaded` kept an already-open response entry instead of re-seeding it, which departed from §9.4 rule 6 without approval. It now follows the rule literally, and PLAN INC-08 carries the resulting INC-09 note: do not reload a conversation whose stream is open, or reopen that stream from 0.
+2. In `sse-client.ts`, the read loop's error guard also caught exceptions thrown by the `onEvent` callback, which would have misreported a consumer bug as a `network` close and triggered reconnects. Only `reader.read()` is guarded now.
+3. The same file never flushed the `TextDecoder` at the end of the body. It now does.
+
+Earlier in the session, header comments that contained the literal grep targets (`EventSource`, `Date`, `fetch`) were reworded so the plan's exit greps check the code, not the prose.
+
+Isolated live validation loaded the real web modules through Vite's SSR loader, with no changes to them. It drove the modules against a `dev:api` process controlled by exact PID with its database in a `mktemp -d` directory, plus a local fake SSE server. All 14 check groups passed:
+- configuration defaults and redaction;
+- HTTP client parsing, and every §9.2 classification row;
+- live SSE replay, resume and error envelopes;
+- heartbeat, invalid frames, id≠seq frames, split multi-byte chunks, early body end, abort, and consumer exceptions;
+- reducer rules 1–7, including an AC-013 replay over an active seed and AC-008 duplicate reconciliation;
+- no mutation of reducer input.
+
+The INC-08 exit gate then passed under Node 24.21.0: `npm run typecheck`, no `EventSource` anywhere in `apps/web` (including emitted output), and no `react`/`fetch`/`Date` in `chat-reducer.ts`. The full `npm run check` and `git diff --check` also passed. Nothing was staged or committed.
+
+### 2026-09-30 | execution-context | INC-09 host and a substituted exit smoke
+
+INC-09 ran from committed PLAN/SPECS at `2032832` on Claude Code `2.1.285`, model `opus-5-5`, medium effort, with manual approval mode and the existing Claude and Git accounts unchanged. Every runtime command ran under Node 24.21.0.
+
+The plan's INC-09 exit is a manual, keyboard-only smoke in a real browser, ending with a console check for zero errors and zero CORS warnings. The session's browser-automation connection was unavailable, so that literal browser pass could not be run and is **not** claimed here. Two substitutes ran instead, both from a `mktemp -d` directory and with every process controlled by exact PID:
+- **Real servers.** A throwaway API harness used the real INC-07 container with a routed provider: `failingProvider` on a content's first run, `delayedProvider` for slow streams, the default otherwise. `npm run dev:web` ran beside it. Vite served the page with its new title, and all 14 web modules transformed with HTTP 200 and no errors or warnings. The GET and both preflights (`content-type` for POST, `last-event-id` for the event stream) from `http://localhost:5173` returned `access-control-allow-origin: http://localhost:5173`.
+- **Keyboard-only jsdom smoke.** The real `App` + `ChatProvider` ran under StrictMode, loaded through Vite with the real config, against the live API, using only `user.tab`/`user.keyboard`. All 11 checks passed:
+  - skip link → New conversation → conversation buttons → textarea → Send → Retry order;
+  - create moves focus to the composer;
+  - Enter sends and deltas grow as prefixes up to the completed message;
+  - Shift+Enter inserts a newline;
+  - `?c=` is written and a conversation is selected by keyboard;
+  - refresh mid-stream restores the selection and resumes without duplicated text or messages;
+  - failure shows visibly with an assertive alert, and Space on Retry unmounts the button, returns focus to the composer and completes the replacement with one user message;
+  - `<img src=x onerror=…>` renders as text with no `img` element;
+  - whitespace-only input gives a validation alert with `aria-invalid`;
+  - zero console errors or warnings, and no unhandled rejections.
+
+  jsdom uses Node's `fetch`, which does not enforce CORS; the curl checks above cover CORS.
+
+The full `npm run check` then passed, with the production bundle now built from the app, and `git diff --check` passed. Findings for independent review are in PLAN INC-09: composer-before-list DOM and layout for the §9.6 tab order, `<style>`-as-text CSS, and a synchronously tracked selection that honors the INC-08 reload note. Two fixes were to the throwaway smoke harness only and changed no product code: resolving the user-event CommonJS module shape, and correcting a wrong tab-order expectation for the newest-first conversation list. Two further fixes were **product** fixes, made during self-review before any validation run: the URL writer briefly cleared `?c=` on mount, and React StrictMode's double mount could load the selected conversation twice, which would re-seed an open stream (the INC-08 hazard). Nothing was staged or committed.
+
+### 2026-09-30 | manual-correction | INC-09 review: stale cross-conversation results and favicon 404
+
+The evaluator's independent real-browser probe delayed a conversation's send error, created a new conversation, then released the error. The new conversation showed the old conversation's error. The cause was that the provider's send, retry and load callbacks dispatched their results unconditionally, except for a conversation-id check on loads, and that check cannot reject an A → B → A sequence.
+
+Fix, product code in `ChatProvider.tsx`:
+- Every selection change (select, NOT_FOUND deselect, create) bumps a selection generation.
+- Send, retry and load results are dispatched only when the generation is unchanged since the request.
+- Retained network-failure send keys are now kept per conversation. The key bookkeeping still runs after a switch, because it describes the server-side send, not the screen.
+
+The same probe saw `favicon.ico` return 404. `apps/web/index.html` gained `<link rel="icon" href="data:," />`, which is a narrow deviation from INC-09's title-only scope for that file. It adds no asset and changes no behaviour; PLAN INC-09 records it.
+
+Validation ran under Node 24.21.0 in the same `mktemp -d` directory, with every process controlled by exact PID. The evaluator's own `independent.sqlite*` files in that directory were preserved. A new release-gated probe of the real app ran under StrictMode against the live API harness. It wraps `fetch` so that a request either rejects as a network error on release, or takes a server snapshot immediately and delivers it on release. All 7 checks passed:
+- the reported case;
+- per-conversation keys (fresh key in B, A's retained key reused in A);
+- send result dropped after A → B → A;
+- an older load snapshot, delivered late after A → B → A, does not re-seed A;
+- a retry result is not shown after switching;
+- zero console errors or warnings, and no unhandled rejections.
+
+The probe was not run against the pre-fix code as a negative control; the evaluator's real-browser probe is the failure evidence. The 11-check keyboard-only smoke passed again with no regression. The full `npm run check`, the source greps and `git diff --check` passed, and the built `index.html` carries the icon link. Nothing was staged or committed.
+
+### INC-09 independent acceptance — 2026-09-30
+
+The evaluator reran the reported delayed-send-error reproduction in an isolated real browser: the corrected provider suppresses the old error and preserves the new conversation's draft. A real-browser A → B → A probe released an old empty load snapshot during a newer slow response; the response completed with the expected text and one user message. A separate normal-flow session passed refresh recovery, keyboard Retry/focus and escaped-text rendering with zero console errors and warnings. Deliberately injected HTTP failures were excluded from that normal-console claim.
+
+The literal `npm run dev:api` plus `npm run dev:web` path was also checked with the default provider and a fresh disposable database: keyboard create/send completed and refresh retained the selection with one user message. A fresh browser console reported zero errors and warnings. Independent final `npm run check` and `git diff --check` passed under Node 24.21.0; the runner still reported no product tests. The implementation increment is accepted, not the whole case study. INC-10 through INC-13 tests and INC-14 close-out remain.
+
+Preserved review, raw validation output and parameterized snapshots of the temporary probes are in the independent evaluation repository under `evidence/EXP-002/INC-09-REVIEW.md`, `INC-09-VALIDATION.md` and `validation/inc09/`. Parameterization replaced only the local checkout path. INC-13 now explicitly carries the async-selection/key-scoping regression cases. The evaluator observed a development-only Vite Fast Refresh fallback to full reload while editing the provider's mixed exports; no seamless-HMR claim is made.
+
+### 2026-10-01 | execution-context | INC-10 unit-test layer validated; stopped at commit-ready
+
+INC-10 ran from committed INC-09 (`3396ed86ea3178a5950e211b9cb71e4103e717e1`) on Claude Code `2.1.285`, model `opus-5-5`, medium effort, in manual approval mode with the existing accounts. Every runtime command ran under Node 24.21.0 / npm 11.6.2. A human interruption occurred during the run. Work resumed on 2026-10-01 with an explicit request to stop at commit-ready. Elapsed wall-clock time is not used as productivity evidence.
+
+Earlier in the run, one read-only `node -e` version probe was issued without the pinned PATH export. The evaluator rejected it before it ran, and it was re-issued correctly. Every later runtime command exported the pinned PATH inside its own call.
+
+**Added: 14 test files, no product changes, no new dependencies.**
+- Shared: `contracts`, `params`, `normalize`, `title`, `terminal`.
+- API: four `domain/*` files, `http/error-envelope`, `http/logging`, `provider/deterministic-provider`.
+- Web: `state/chat-reducer`, `api/sse-client`.
+
+**Named INC-10 cases, all present.** Expected values are written out independently from SPECS; none are computed by the code under test.
+- **AC-003:** identical normalized input gives byte-identical provider payloads across instances and response ids. A purity check makes clock, random and crypto calls throw.
+- **AC-012:** the §6.3 five-row table at the parser boundary. Row 4 (out of range) is asserted as the parser returning `ok`; the 400 itself is the route's decision and is scheduled for testing over the real route in INC-12.
+- **AC-019:** whitespace-only, 4000, 4001, and 4000 vs 4001 surrogate-pair code points.
+- **AC-021:** the four redaction fixtures, plus logging content absence. The logging case runs the real `buildServer` and captures pino output at the `fs` layer. It asserts that at least two lines were captured, so a vacuous pass is impossible, and that no line contains any 4-character substring of the content.
+- **AC-013:** a replayed `seq ≤ lastAppliedEventId` returns the same state reference, together with an active-seed replay that yields the text exactly once.
+
+Further boundaries covered:
+- all 16 response-status transitions and the append guards;
+- order-sensitive `classifyRetry` cases;
+- NFC vs NFD idempotency conflict, corrected after independent review so it uses the same accented text in both forms and asserts the fixtures differ;
+- the fixed HTTP status map;
+- every reducer action and the §9.6 announcement table, run over deep-frozen inputs;
+- SSE framing with one byte per chunk, corrected after review so every multi-byte sequence is provably split;
+- invalid payloads, non-2xx mapping, abort, a non-abort mid-body read failure, and a null 200 body.
+
+**Explicit exclusions and limits:**
+- A consumer callback that throws (`onEvent`) is not unit-tested. The client deliberately rethrows to the caller, which Vitest reports as an unhandled error; INC-08's live validation exercised that path. Callback-error coverage is therefore not claimed to be complete.
+- These are unit tests only. They do not establish integration, SSE-route, restart or UI-component behaviour (INC-11 to INC-13), and they do not complete EXP-002 or any broader acceptance criterion on their own.
+
+**Corrections during the run, all to test code only:**
+- an over-reasoned reducer dedupe expectation, replaced by separate id-dedupe and same-content-different-id cases;
+- a miscounted UTF-8 byte literal (18, not 19);
+- an off-by-one provider chunk count.
+
+None exposed a product bug.
+
+**Results.** `npm test` exit 0 and `npm run check` exit 0, each captured without a masking pipeline: 14 files, 271 tests. Run per project: node 12 files / 199 tests (exit 0) and web 2 files / 72 tests (exit 0). `git diff --check` exit 0. The evaluator independently reproduced the same counts and exits. Nothing was staged, committed or pushed.
+
+### 2026-10-05 | publication-context | INC-10 checkpoint resumed
+
+The author requested continuation after the commit-ready stop. The evaluator reran `npm run check` using Node 24.21.0/npm 11.6.2: exit 0, 271 tests/14 files, strict typechecking and production build passed. Only the reviewed unit tests and their plan/log are included in this checkpoint; no account, permission, dependency or product changes. Exact commit and remote verification are recorded in the independent evaluation repository. INC-11 has not executed yet.
+
+### 2026-10-06 | planning-context | Integration and evidence refinements
+
+The author authorized the evaluator's plan refinements and a documentation commit. INC-10 is published at `e8404451f6a922cd8dcacad0662d40cd059cc5b6`; INC-11 has not started. The plan now explicitly assigns SPECS §10's cross-container event-data determinism assertion to INC-11 and maps it to AC-003. It clarifies controlled asynchronous synchronization, terminal-state waits, independent fixture checks, owned-resource cleanup, and real-process restart/shutdown evidence. Each runtime call retains the pinned Node 24.21.0/npm 11.6.2 environment; validation must preserve real exit statuses, failed runs and corrections, and the existing 271 passing tests.
+
+INC-14 will finalize the already-existing evidence documents and retain the throwing-consumer-callback coverage limitation unless later committed evidence closes it. These are evaluator-authored planning clarifications of existing contracts, not Claude implementation results or new acceptance criteria. No product, test, dependency, account or runtime configuration changed. This documentation revision is checked for diff hygiene and consistency; it does not constitute a new product test run.
+
+### 2026-10-07 | execution-context | INC-11 integration tests: harness defect corrected, validated, stopped for final review
+
+**Host and process events — not Rosetta or product results.**
+- INC-11 started from the clean published target `f56d257570d9ff95a9a15e4bb24e3671d143245a`, inside the saved Rosetta coding-flow conversation, at Phase 11 (tests).
+- The previous terminal process was gone, so this saved conversation was resumed in a new manual-mode process. The evaluator's CLI version probe reported `2.1.283`, while the earlier evidence recorded `2.1.285`. That drift is recorded as observed; it is not normalized.
+- An unsolicited LSP installation prompt was declined ("No, not now").
+- Authentication was interrupted. After the user reauthenticated, a no-tool verification message confirmed the conversation could respond. Neither event is a Rosetta or product result.
+- Later the host went to sleep partway through the correction step. On resume, the disk was inspected first: every approved edit had landed, and none was duplicated.
+- The account, model/effort, Rosetta 3.1.13 plugin, empty MCP, disabled Chrome and manual one-time approvals were unchanged. Every runtime call prepended the pinned Node 24.21.0 binary directory to PATH (npm 11.6.2). No dependency, configuration or product change was made.
+
+**Added: 14 test files, 93 tests.** The 271 accepted INC-10 tests are unchanged and still pass (no previously tracked test or product file modified; only the plan and experiment log are updated).
+
+| File | Tests | Covers | Evidence level |
+|---|---|---|---|
+| `persistence/schema.test.ts` | 4 | §5.2 shape, pragmas, idempotence; **AC-005** "restart on the same file preserves all four tables" | container, test-owned temp file |
+| `persistence/unit-of-work.test.ts` | 4 | §5.5 commit/rollback, Promise-returning fn rejected | `:memory:` |
+| `persistence/ordering.test.ts` | 1 | **AC-007** "identical timestamps keep list and history order" (+ reopen) | container, temp file |
+| `persistence/repos.test.ts` | 8 | all four unique indexes hold under raw SQL; seq allocation; §5.4 corrupt rows refused | `:memory:` |
+| `usecases/send-message.test.ts` | 13 | **AC-006** (faults at insert and at touch), **AC-008** (`runCount === 1`), **AC-009**, **AC-016**, §10 **AC-003** determinism across two containers, validation/lookup with zero writes | container, `fakeClock`+`sequentialIds` |
+| `usecases/retry-response.test.ts` | 5 | **AC-017** "second retry returns the same replacement, one user message"; retry rejections; retry gate | container |
+| `usecases/get-conversation.test.ts` | 3 | title rules, `activeResponse`, NOT_FOUND | container |
+| `stream/recovery.test.ts` | 4 | **AC-014** zero-event `[started@1, failed@2]` and partial-stream `failed@maxSeq+1` branches; idempotence; a recovered replacement is not retryable; a completed response is untouched | container, same-file reopen |
+| `http/routes/messages.test.ts` | 21 | §10 error-category table over HTTP (**AC-019**); happy data; idempotency over HTTP; the named one-active-response case | real `buildServer` via inject |
+| `http/routes/responses.test.ts` | 6 | retry over HTTP; the named retry-while-active / replay-active-retry case | real server |
+| `http/routes/conversations.test.ts` | 9 | §4.3 status codes; strict and malformed bodies; unknown route | real server |
+| `http/routes/cors.test.ts` | 8 | **AC-023** "foreign origin gets no access-control-allow-origin, configured origin does"; preflights; near-miss origins | real server |
+| `http/routes/health.test.ts` | 3 | health 200/503; draining per §7.5 step 1 | real server |
+| `bootstrap/shutdown.test.ts` | 4 | the named slow-but-not-hung drain (**container level**); **real process**: pinned binary, the named idle keep-alive SIGINT case, and a same-file restart with four-table byte-identical snapshots plus `recoveredResponses: 1` after a seeded interruption | container + child process of the built `dist/index.js` |
+
+Per-file counts were measured with Vitest's JSON reporter (`agents/TEMP/inc11/inc11-counts.json`: 93 tests, 14 files, all passed, exit 0). A first draft of this table had estimated `conversations.test.ts` at 8 tests; the measured count is 9.
+
+**Evidence-level separation.** Deterministic assertions use `fakeClock` + `sequentialIds` at container level. The real-clock bounds (drain duration < `SHUTDOWN_TIMEOUT_MS`, process exit < `SHUTDOWN_TIMEOUT_MS`) appear only in `shutdown.test.ts` and are labelled there.
+
+The real-process tests first build the API project with the repository's own `tsc -b`, on the same pinned Node binary, because `npm test`'s `pretest` builds only the shared package. They then spawn `process.execPath dist/index.js` with an explicit environment: the pinned binary directory on PATH, plus only the five §7.1 variables. The test never reads `process.env`. Readiness and terminal states are explicit signals: a successful `/health`, and `activeResponse === null`. In-process runs are awaited through the container's §7.5 registry promises.
+
+**Failures and corrections, all retained.** Logs are under the git-ignored `agents/TEMP/inc11/`.
+1. `run-shutdown-1.log` (exit 1; 1 failed, 3 passed): the keep-alive test hung until its 60 s timeout. Independent review identified the cause as a **test-harness defect, not a product finding**. A promise resolved with another promise assimilates it, so the test awaited socket closure before it ever sent SIGINT.
+   - Corrected: the close observer is now returned inside an object.
+   - A throwaway diagnostic, `keepalive-diagnose.mjs`, was written but **not executed**. Review found it lacked owned-resource cleanup on failure, and it stays unexecuted.
+2. Review also required:
+   - an owned-resource cleanup stack in `shutdown.test.ts`, with every resource registered on creation: children killed and their exits awaited, agents and sockets destroyed, runs aborted and settled, the slow fixture's timer cleared, databases closed, and temp directories removed last;
+   - release plus abort of gated runs in teardown in `send-message`, `retry-response`, `get-conversation` and `routes/messages` (`routes/responses` already released at setup and now also aborts);
+   - non-empty, byte-identical snapshots of all four tables, read from the file before stopping run 1 and after the real restart into run 2;
+   - a real persist-before-publish assertion for AC-016: the database is read inside the intercepted `publish`.
+
+   After these corrections, `run-shutdown-2.log` exited 0 (4 passed).
+3. `gate-*.log`: the first full gate failed (`npm run typecheck` and `npm run check` exit 1, `npm test` exit 0). The cause was a test-only type error, `Parameters<…>[1]["provider"]` on an optional parameter; Vitest does not typecheck. It was corrected to `ContainerOverrides["provider"]`.
+
+Earlier self-corrections, before their respective scoped runs: `repos.test.ts` was rewritten to remove `as never` casts and dead lines, and a fabricated status-flip fixture in `retry-response.test.ts` was replaced with a genuinely gated active run.
+
+**Final gate (`gate2-*.log`), exits captured without pipelines:**
+- `npm run typecheck`, `npm test`, `npm run check` and `git diff --check`: all exit 0;
+- `npm test` and `npm run check`: 28 files, 364 tests each;
+- vitest node project: 26 files / 292 tests, exit 0;
+- vitest web project: 2 files / 72 tests, exit 0.
+
+**Cleanup outcomes:** no test temp directories (`chat-poc-XXXXXX`) remained, no `dist/index.js` process survived, and no loopback listener was left. The git-ignored `apps/api/dist` is rebuilt by the process tests as normal build output.
+
+**Limits.** These are API integration and restart tests only. SSE replay over the real route (INC-12) and React components (INC-13) are not covered here. The INC-10 throwing-callback limitation is unchanged. Nothing was staged, committed or pushed, and INC-12 has not started.
+
+### 2026-10-07 | independent-review-context | INC-11 accepted for checkpoint publication
+
+The evaluator independently read all 14 new test files against the approved plan, verified that fixed requirements, acceptance criteria, dependencies, configuration, product code and all existing unit tests were unchanged, and ran `npm run check` under Node 24.21.0/npm 11.6.2. Exit 0: strict typechecking, 364 tests in 28 files, and production build passed.
+
+A separate disposable-copy probe deliberately threw immediately after four provider gates and one idle keep-alive socket became active. It exited 1 with exactly five intended synthetic failures, 41 skipped tests and no hook timeout or unhandled error. No test-owned database directory or API process remained afterward. These are evaluator-authored fault injections into a copy, not product changes, additional committed tests or product failures. The experiment checkout was untouched by the probe.
+
+Acceptance covers INC-11 only. Host resume and two sleep-error interruptions do not establish clean-clone recovery. The ignored `agents/TEMP/chat-poc/coding-flow-state.md` ledger remains stale (Phase 7/INC-00 and Phase 11 pending); tracked plan/log progress is not proof of complete Rosetta phase conformance. The ledger was deliberately left unchanged, as directed earlier. No lint command ran; diff hygiene, typecheck, tests and build are the validated gates.
+
+Initial and corrected failure/passing output, independent check and cleanup probe are preserved publicly in the separate evaluation repository under `evidence/EXP-002/validation/inc11/`, with review in `INC-11-REVIEW.md`. This checkpoint includes only the 14 owned tests and plan/log. Chamath remains Git author/committer; no account configuration changed. Exact target commit and remote verification are recorded there after publication. INC-12 SSE replay tests, INC-13 UI regressions and INC-14 fresh-checkout close-out remain.
+
+### 2026-10-08 | publication-context | INC-11 validation refreshed
+
+Before publication after the day boundary, the evaluator reran pinned `npm run check`: exit 0, typecheck, 364 tests/28 files and build passed. The previously reviewed test files were unchanged. GitHub authentication still reports `chamathsilva`; the target SSH origin and author/committer configuration remain Chamath's. This commit contains only the accepted 14 tests and plan/log updates. Exact commit and push verification live in the separate evaluation review; no INC-12 execution or whole-case-study acceptance is claimed.
+
+### 2026-10-08 | execution-context | INC-12 SSE replay tests: interruptions, a coverage finding, validated, stopped for final review
+
+**Host and process events — not Rosetta or product results.**
+- INC-12 started from published INC-11 `a50aa08548c903e3628cff7889988823bb42863e`, in the same saved conversation and the same checkout.
+- From inside the session: the model is Opus 5.5 (`claude-opus-5-5`); the effort level is not observable; the permission posture is manual one-time approval. No `claude` binary was on the shell's PATH, so the host version could not be read from inside the session. The evaluator reported that the installed and running host became `2.1.287` after a process restart. This is recorded as further host drift (earlier records: `2.1.283`, `2.1.285`) and is not normalized.
+- **Blocked attempt.** The first `hub.test.ts` Write failed with `EPERM: operation not permitted` on `apps/api/src/stream`. The pending `runner.test.ts` Write was then rejected to stop further operations. Independent inspection found no partial files and a clean target; the old process ended during the interruption, and a fresh process resumed the same conversation.
+- The rejected `runner.test.ts` draft contained a test defect, `await c.startRun(...)` on a `void` function; it was corrected when the write was repeated.
+- **Two host sleeps** ("API error") followed, after `hub`/`runner` and after `subscribe` were written. Each resume preserved the files on disk and their results.
+- **One validation command was cancelled before approval.** After a terminal redraw, the safety reviewer could not inspect the full compound gate command. That was approval handling, not a test failure. Validation was re-issued as short separate commands.
+- **Two per-project recount commands** (vitest `--project node` / `--project web`) were cancelled before execution. They produced no test results, none are claimed, and no more precise cause is recorded.
+
+The account, Git identity, Rosetta 3.1.13 plugin, strict empty MCP, disabled Chrome, and Node 24.21.0 / npm 11.6.2 pinned per call were unchanged. No product, dependency, contract or settings change was made, and no lint tool was run.
+
+**Added: 5 test files, 47 tests, measured with the JSON reporter.**
+
+| File | Tests | Covers |
+|---|---|---|
+| `stream/hub.test.ts` | 7 | routing by response id (FR-005), unsubscribe, self-unsubscribe during publish, dropping a throwing subscriber, `closeAll` |
+| `stream/runner.test.ts` | 6 | **AC-010** "seq 1..n, one start, one terminal, nothing after terminal"; persist-then-emit for each publish after the test subscribes (the `response.started` publish happens synchronously inside `sendMessage`, before subscription, so it is not observed here; INC-11 covers start ordering separately); error chunk, thrown error, missing end chunk and abort each give exactly one `response.failed` |
+| `stream/subscribe.test.ts` | 8 | **AC-011** "reconnect at mid-stream replays only later events, concatenated deltas contain no repeat, then continues live"; active-stream buffered de-duplication; "reconnect on a terminal response replays then closes"; "`Last-Event-ID === maxSeq` on a terminal response closes with zero frames"; "synchronous backfill/read or sink/write failure detaches the buffering subscriber before rethrow" (read, write and terminal-check failures; subscriber count observed); live write failure; detach and `closeAll`; live isolation |
+| `http/sse.test.ts` | 8 | exact §6.1 framing (one data line, JSON-escaped); fixed headers and constants; "heartbeat frames carry no `id:`" (fake `setInterval` only, loopback socket); CORS headers carried onto the hijacked reply; disconnect detaches once and clears the heartbeat; attach failure after headers drops the connection |
+| `http/routes/response-events.test.ts` | 18 | the five §6.3 rows over the real route (**AC-012**), with both 400s returned as JSON envelopes rather than SSE; `maxSeq` zero frames; AC-010 frame shape; 404/400; "a stream for response A never yields a frame for response B" (**FR-005**); a live replay-to-live reconnect over a loopback socket |
+
+**Failures, corrections and findings, all retained** in the git-ignored `agents/TEMP/inc12/`:
+1. `run-sse-1.log` (exit 1; 3 failed, 5 passed). A **test-harness defect**: the harness waited for response headers before anything had been written, but Node's `writeHead` only buffers headers until the first body write. Corrected by writing a frame or heartbeat first (`run-sse-2.log`, exit 0). One observation is recorded **without any product change**: a client attached to a stream with nothing to replay receives no headers until the first event or heartbeat. SPECS §6.1 does not require an earlier flush.
+2. **Coverage finding from independent review (test strength PARTIAL).** In a disposable copy, the evaluator removed only `event.seq <= maxSent` from the deliver guard in `attachResponseStream`, and all 47 INC-12 tests still passed. The original buffered-dedup test replayed a **completed** stream: the backlog's terminal frame set `ended` before the buffer was flushed, so the sequence guard was never exercised. The test was replaced. It now uses an active, non-terminal backlog (seq 1–3), overlapping buffered publications (seq 2 and 3) landing during the synchronous backfill, and then live `delta@4` and `completed@5` on the real repository and hub. It asserts the exact ids `[1, 2, 3, 4, 5]`, the full text exactly once, and that the stream is still open after the flush (`run-subscribe-2.log`, exit 0). Claude Code did not re-run the mutation check, because that needs a product edit in a disposable copy. **Evaluator evidence, not a Claude Code run:** with the strengthened test, the evaluator re-ran the same duplicate-guard mutant in the disposable copy. It now fails exactly the active-overlap assertion, `[1, 2, 3, 2, 3]` against the expected `[1, 2, 3]` (exit 1; 1 failed, 7 passed; no cleanup timeout). The unchanged product passes all 8 strengthened `subscribe` tests. The original PARTIAL test-strength judgment stands as the finding for the test as first written.
+3. A self-review cast (`as never`) in `sse.test.ts` was replaced with schema parsing. This happened after the SSE targeted validation runs (`run-sse-1.log`, `run-sse-2.log`) and before the combined targeted run and the final gates.
+
+**Validation:**
+- First gate: `gate-typecheck.log` exit 0; `gate-npm-check.log` exit 0 (33 files / 411 tests, build OK); targeted five files exit 0, 47 tests (`inc12-counts.json`).
+- After the correction: targeted five files exit 0, 47 tests (`inc12-counts-2.json`); `npm run check` exit 0, 33 files / 411 tests, build OK (`gate2-npm-check.log`); `git diff --check` exit 0. The 364 tests that existed before INC-12 are unchanged; no tracked test file was modified.
+- Cleanup check, inspection only: no entrypoint processes, no node loopback listeners.
+
+**Limits.** SSE stream tests only; React components (INC-13) are not covered. The ignored workflow ledger was not repaired, and full phase conformance is not claimed. Nothing was staged, committed or pushed, and INC-13 has not started.
+
+### 2026-10-12 | execution-context | INC-13 React tests: ENOSPC interruption, harness corrections, review strengthening, validated, stopped for final review
+
+Date label: the client/author date is 2026-10-12 (America/Chicago). An earlier draft of this heading used the host-local label 2026-10-11. Raw log and run timestamps are unchanged.
+
+**Host and process events — not Rosetta or product results.**
+- INC-13 started from published INC-12 `c7683df3e14800889fb06344366b67087ac2c5b6`, in the same saved conversation and the same checkout.
+- Native session metadata (reported by the evaluator) shows the running host `2.1.287`, model `claude-opus-5-5`. Separately, the shell's installed `claude` binary (in the pinned Node bin directory) reported `2.1.296`. That is an installed-binary observation, **not** the running-host version.
+- From inside the session, the effort level is not observable; the evaluator reports medium. The permission posture is manual one-time approval. Strict empty MCP and no Chrome were preserved.
+- **ENOSPC interruption.** The disk filled up. The first `ChatProvider.test.tsx` Write failed with `ENOSPC: no space left on device` (on its temp file), and the provider test run failed before starting because the Bash tool could not create its output file. No result is claimed for either. The host also warned that **transcript writes failed**, so recent messages may be missing from disk; complete transcript evidence is **not** claimed for this period.
+- The author freed space. Independent verification found 11 GiB available, HEAD unchanged, only the preserved hook test untracked, both hook logs intact, and no provider file or temp fragment. The evaluator saved INC-13 resume evidence.
+- The account and authentication, frozen Rosetta 3.1.13 and the Chamath Git identity were reconfirmed. No account or configuration switch, and no product, dependency, settings or fixed-contract change.
+
+**Initially added: 3 test files, 25 tests, measured with the JSON reporter.** All IO tests stub `fetch`; there is no real network, no native SSE object and no polyfill.
+
+| File | Tests | Covers |
+|---|---|---|
+| `hooks/useResponseStream.test.ts` | 11 | the §6.5 backoff `250/500/1000/2000/4000/4000` ms checked to the millisecond (fake `setTimeout` only); after 6 attempts a `network` error with action `reload`; resume from `lastAppliedEventId`; attempt reset after a successful event; cancellation on selection change and unmount, both for a live request and a pending reconnect; no stream for terminal responses; an HTTP error closes with no reconnect |
+| `state/ChatProvider.test.tsx` | 8 | INC-09 carry-forwards, using deferred fetches the test settles explicitly: delayed send error and send success, and a delayed retry error, each released after a selection change (nothing shown; the newly selected draft and sending state unchanged); a stale send and a stale load across A → B → A; no reload of the selected conversation; retained send keys reused within A, fresh for the same text in B, released after a non-network failure; StrictMode + `?c=` with one load, one live stream and the text seeded once |
+| `components/App.test.tsx` | 6 | the six named tests — **AC-002**, **AC-013**, **AC-018**, **AC-020**, **AC-022** (`tab()`/`keyboard()` only) and **FR-008** — over the real `App` under StrictMode and an in-memory fake API whose SSE frames are pushed explicitly |
+
+**Failures and corrections, all retained** in the git-ignored `agents/TEMP/inc13/`; no product defect was exposed:
+1. `run-hook-1.log` (exit 1; 1 failed, 9 passed). A test-logic error: one test merged "unmount cancels a pending reconnect" with "unmount aborts the request" after the request had already ended through a drop. It was split into two tests (`run-hook-2.log`, exit 0, 11 passed).
+2. The blocked provider Write was repeated after the disk space was freed (`run-provider-1.log`, exit 0, 8 passed). It differs from the blocked draft only in dropping an unused import and in waiting for the list request before answering it in the StrictMode test.
+3. `run-app-1.log` (exit 1; 6 failed). A harness error: the tests used `@testing-library/jest-dom` matchers, but jest-dom is not a dependency. They were replaced with plain DOM assertions; no dependency was added.
+4. `run-app-2.log` (exit 1; 1 failed, 5 passed). A wrong expectation: after a retry, the failed **original** response correctly stays visible as its own item with no streamed text. The assertion now checks the failed original and the replacement's completed text exactly once (`run-app-3.log`, exit 0, 6 passed, zero act warnings).
+
+**Validation**, each command run separately with its exit captured:
+- targeted three files: exit 0, 25 tests (`inc13-counts.json`);
+- `npm run typecheck`: exit 0;
+- `npm run check`: exit 0, 36 files / 436 tests (the 411 existing tests unchanged, plus 25 new), build OK;
+- `git diff --check`: exit 0;
+- a grep for `EventSource`, `dangerouslySetInnerHTML` and `innerHTML` in `apps/web/src` and `index.html`: none.
+
+The counts above (25 tests; 436 total) are the **initial** INC-13 results, kept as recorded.
+
+**Independent initial review: test strength PARTIAL, two gaps.** The evaluator found that the 25 new tests and the full 436 / typecheck / build all passed, but that two cases were weaker than the carry-forwards require.
+- **Evaluator evidence, not a Claude Code run:** in a bounded disposable copy with all three generation guards disabled, 4 of the 8 initial provider tests failed.
+
+The gaps were closed with test-only changes:
+1. **New provider case**, the existing one kept. A's send is held; B is selected; B's own send is started and kept pending, so `sending = true` and B's optimistic message is on screen. Then A's network error is released. The test proves B's draft, `sending` flag, optimistic message, `lastError` and announcement are all unchanged, then releases B normally (`run-provider-2.log`, exit 0, 9 passed).
+2. **Strengthened App retry test.** The fake API gained `holdNext`, plus a teardown `releaseAll` so a held request can never stay pending. The retry request is held in flight; the still-mounted Retry is disabled (status "Retrying…"); a second click issues no request. The request is then released and the replacement completed. The test now asserts the two exact assistant items instead of filtering empty strings:
+   - the failed original: no streamed text, "Response failed", the fixed failure text, no button;
+   - the completed replacement: its text and "Response complete".
+
+   Result: `run-app-4.log`, exit 0, 6 passed, zero act warnings.
+
+The original logs and `inc13-counts.json` are unchanged; the final results use distinct files.
+
+**Final validation**, each command run separately with its exit captured:
+- targeted three files: exit 0, **26** tests — hook 11, provider 9, App 6 (`inc13-counts-final.json`);
+- `npm run typecheck`: exit 0 (`gate-final-typecheck.log`);
+- `npm run check`: exit 0, 36 files / **437** tests (411 existing, unchanged, plus 26 new), build OK (`gate-final-npm-check.log`);
+- `git diff --check`: exit 0.
+
+**Limits.** These are jsdom component tests, not a real-browser pass. The ignored workflow ledger was not repaired, and full phase conformance and clean-clone recovery are not claimed. Nothing was staged, committed or pushed, and INC-14 has not started.
+
+### 2026-10-12 | evaluator | INC-13 accepted for publication
+
+Independent final check passed 437 tests/36 files, product/test typecheck and build (exit 0).
+The new pending-B test rejects a disposable generation-guard mutant (1 failed/8 skipped);
+the strengthened Retry test rejects removal of in-flight disabling (1 failed/5 skipped).
+These are evaluator probes, not Claude runs or product changes. Initial partial judgment,
+original failures and the ENOSPC transcript-retention limitation remain recorded. Accept INC-13
+only; no complete EXP-002, real-browser E2E or phase-conformance claim. Publication verification
+is recorded separately in the evaluation repository; INC-14 has not started.
+
+### 2026-10-12 | execution-context | INC-14 evidence and close-out: living-doc maintenance gap, fresh clone of `cab37e1`, stopped for final review
+
+**Host and process events — not Rosetta or product results.**
+- INC-14 started from published INC-13 `cab37e175f2916c841068030efd1ac0f0ff9828b` (remote tip verified with `git ls-remote`), in the same saved conversation and checkout.
+- Model: `claude-opus-5-5`. The running host version and effort level are not observable from inside the session. The evaluator reports manual approval, medium effort, strict empty MCP and no Chrome; the last host value recorded is the evaluator-reported `2.1.287` (INC-13).
+- Every runtime command exported the pinned Node 24.21.0 / npm 11.6.2 PATH.
+- No product, test, dependency, settings, account or fixed-contract change.
+
+**Finding: living docs were not maintained per increment** (from the evaluator's frozen initial artifact assessment; preserved, not backdated). At `cab37e1`:
+- `EVIDENCE-MAP.md` still had `TBD` / `Not started` rows for UI work already implemented (INC-08/INC-09) and tested (INC-13), and "tests pending" text for tests already published (INC-10..INC-12);
+- its header claimed incremental maintenance, which had not happened;
+- its AC-001 row said "Re-verified again at INC-14 exit" before any INC-14 run;
+- `README.md` still described INC-05-era status and a placeholder web app; `ARCHITECTURE.md`, `CODEMAP.md` and `TECHSTACK.md` still described the seed; `agents/IMPLEMENTATION.md` stopped at INC-07; `docs/TODO.md` still listed three items completed in INC-00..INC-08.
+
+All of these were rewritten once, in INC-14, from the committed code, tests and this log. `EVIDENCE-MAP.md`, `TODO.md` and `ARCHITECTURE.md` carry the finding in their own text, and the earlier versions remain in git history. README correction was explicitly authorized.
+
+**Changed (docs only):**
+- `EVIDENCE-MAP.md`: 11 FR and 26 AC rows, each with implementation and test paths. Evidence levels are separated: unit, container-integration, real-process, jsdom, manual/probe. Limits L1–L7 are recorded. AC-015 stays out of product.
+- `ASSUMPTIONS.md`: A-007, A-009, A-011, A-012 and A-013 resolved. Each fact is taken from the approved SPECS sections and the source, with a "Verified by" line. A-009's target `docs/CONTEXT.md` already states the rule and is outside INC-14's file list, so it was not edited.
+- `ARCHITECTURE.md`, `CODEMAP.md` (148 tracked files, written by hand; the ignored generator script was not used), `TECHSTACK.md`, `TODO.md`, `agents/IMPLEMENTATION.md`, `README.md` (status plus a run guide), and the PLAN status line.
+- `docs/PATTERNS/*`: unchanged; no new configuration pattern emerged.
+
+**Corrections during the run:**
+1. The fresh-clone command was first proposed as `git clone --branch experiment/EXP-002 --single-branch` without `--no-tags`. The evaluator/orchestrator cancelled it at the approval prompt before it ran, and directed adding `--no-tags` so that unrelated governance refs could not be imported. (The first draft of this entry wrongly attributed the cancellation to a direct human decision; corrected after independent review, 2026-10-12.) It was re-issued with `--no-tags`; the clone has 0 tags and only the EXP-002 refs.
+2. A first `ARCHITECTURE.md` draft gave the shutdown order wrongly (`closeAll` before abort). It was corrected against `bootstrap/shutdown.ts` (SPECS §7.5: drain, abort, `closeAll`, bounded await, `app.close()`, DB close) before validation.
+3. A first `README.md` draft paraphrased the fixed experiment rule, which changed its meaning. The original wording was restored.
+
+**Fresh-clone validation.** The final docs commit does not exist yet, so the clean published `cab37e1` was validated. A new git-ignored directory was created with `mktemp -d` under `agents/TEMP/inc14/`. The public branch was cloned there with `--single-branch --no-tags`. Results:
+- HEAD `cab37e1`, clean tree, no `node_modules`, `dist` or `data`; nothing copied from the working checkout;
+- pinned `npm ci`: exit 0;
+- `npm run check`: exit 0, 36 files / 437 tests, build OK;
+- the tree was still clean afterwards.
+
+`npm ci` also printed an audit notice of 3 vulnerabilities (2 moderate, 1 high). It is recorded as an observation only; no dependency was changed, and it is listed in `docs/TODO.md`. **The evaluator must fresh-clone revalidate the final publication commit**; Claude Code has not validated it.
+
+**Working-checkout validation** after the doc edits: pinned `npm run check` exit 0, 36 files / 437 tests, build OK; `git diff --check` exit 0. The logs are in the git-ignored `agents/TEMP/inc14/` (`fresh-clone.log`, `fresh-npm-ci.log`, `fresh-npm-check.log`, `working-npm-check.log`). The disposable clone directory `agents/TEMP/inc14/fresh-clone.7N1Mcd/` was left in place, not deleted.
+
+**AC-026 coverage.** This log has entries covering INC-00 through INC-14: missed requirements, manual and review corrections, specification corrections, host/session interruptions, rejected proposals, and evaluator findings. One style observation: entries from INC-06 onward use categories (`execution-context`, `publication-context`, `planning-context`, `plan-refinement`, `independent-review-context`, `evaluator`) beyond the four named in this file's header. They are kept as written, not renamed.
+
+**Limits, unchanged by INC-14:**
+- the INC-10 throwing-callback coverage exclusion (L1);
+- seeded interruptions, not power loss (L2);
+- jsdom versus real browser (L3);
+- the stale ignored phase ledger, deliberately not repaired (L4);
+- the INC-13 ENOSPC transcript gap (L5).
+
+AC-015 is out of product. No GOV-004 ref or artifact was read, diffed or checked out, and fresh-clone application checks do not prove fresh-agent recovery. No full phase conformance or EXP-002 completion is claimed. Nothing was staged, committed, pushed or tagged.
+
+## INC-14 independent documentation review — 2026-10-12
+
+The evaluator reviewed the ten-file documentation diff after Claude stopped. No product, test,
+dependency, settings or fixed requirement/acceptance file changed. Claude corrected startup-error
+wording, identical injected-clock/id qualification for AC-003, evaluator-versus-human attribution
+and the stale deferred-items summary after independent feedback. Original draft findings remain
+in the evaluation record. Actor self-review separately corrected shutdown order and restored
+the original README experiment rule before that feedback.
+
+Only after the actor stopped, the evaluator reconciled AC-015 from the already separate published
+GOV-004/004B reports: technical reconstruction passed, approval-state recovery failed. The evidence
+map now explicitly marks the complete recovery claim Failed, rather than exempting it. No governance
+artifact was supplied to the implementation actor. This honors the fixed completion rule and is
+not a product change or a new experiment. Fresh final-tree validation and publication remain.
+
+## Deferred items carried from `docs/TODO.md`
+
+- Historical (pre-implementation): the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7; nothing was deferred at that point.
+- Current, as of INC-14 (2026-10-12): four open follow-ups, all in `docs/TODO.md`:
+  1. P2: review the `npm audit` findings (3 vulnerabilities from the fresh-clone `npm ci`). A dependency change would need a recorded study deviation.
+  2. P3: test a throwing SSE consumer callback (EVIDENCE-MAP limit L1).
+  3. P3: dedicated tests for both env parsers and `http-client.ts` (limit L6).
+  4. P3: automated real-browser E2E (limit L3).

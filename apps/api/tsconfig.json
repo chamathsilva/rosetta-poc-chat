@@ -5,10 +5,18 @@
     "declaration": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "types": ["node"],
     "rootDir": "src",
     "outDir": "dist"
   },
   "include": [
     "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
+  ],
+  "references": [
+    { "path": "../../packages/shared" }
   ]
 }

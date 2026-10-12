@@ -1,14 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-
-function SeedPlaceholder() {
-  return (
-    <main>
-      <h1>Streaming Chat POC</h1>
-      <p>Product implementation begins during EXP-002.</p>
-    </main>
-  );
-}
+import { App } from "./components/App";
+import { ChatProvider } from "./state/ChatProvider";
 
 const rootElement = document.getElementById("root");
 
@@ -18,6 +11,8 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <SeedPlaceholder />
+    <ChatProvider>
+      <App />
+    </ChatProvider>
   </StrictMode>
 );

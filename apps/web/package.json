@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit && vite build",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "vite build",
+    "typecheck": "tsc -b tsconfig.json",
+    "dev": "vite"
   },
   "dependencies": {
     "@rosetta-poc/chat-shared": "0.0.0",

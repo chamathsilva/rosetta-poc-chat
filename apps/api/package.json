@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -b tsconfig.json",
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "@fastify/cors": "11.3.0",

@@ -1,0 +1,26 @@
+{
+  "description": "Disposable public TypeScript streaming chat POC (React web, Fastify API, SSE, SQLite) used for an independent evaluation of Rosetta.",
+  "servicesDescription": {
+    "api": "Fastify API placeholder: chat, SSE streaming, SQLite persistence, recovery",
+    "web": "React/Vite web client placeholder",
+    "shared": "Shared TypeScript contracts placeholder"
+  },
+  "codingAgents": [
+    "claude-code"
+  ],
+  "sdlc": {
+    "scm": "GitHub",
+    "scm_project": "https://github.com/chamathsilva/rosetta-poc-chat",
+    "unit_tests": "in-repository",
+    "integration_tests": "in-repository",
+    "e2e_tests": "in-repository"
+  },
+  "vocabulary": {
+    "EXP-002": "Experiment run: Rosetta-assisted build of the chat POC from seed chat-seed-v1",
+    "GOV-004": "Experiment run: interrupted-session recovery from the same seed, separate branch",
+    "seed": "Immutable non-functional starting commit tagged chat-seed-v1"
+  },
+  "versions": {
+    "rosetta": "3.1.13"
+  }
+}

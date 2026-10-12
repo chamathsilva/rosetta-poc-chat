@@ -13,11 +13,14 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.test.json --noEmit",
+    "build": "tsc -b tsconfig.json && npm run build -w @rosetta-poc/chat-web",
+    "pretest": "tsc -b packages/shared/tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "dev:api": "npm run build -w @rosetta-poc/chat-shared && npm run build -w @rosetta-poc/chat-api && npm run start -w @rosetta-poc/chat-api",
+    "dev:web": "npm run build -w @rosetta-poc/chat-shared && npm run dev -w @rosetta-poc/chat-web"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.3",
