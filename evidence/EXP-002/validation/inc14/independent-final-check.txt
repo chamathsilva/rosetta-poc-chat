@@ -1,0 +1,42 @@
+
+> rosetta-poc-chat@0.0.0 check
+> npm run typecheck && npm test && npm run build
+
+
+> rosetta-poc-chat@0.0.0 typecheck
+> tsc -b tsconfig.json && tsc -p tsconfig.test.json --noEmit
+
+
+> rosetta-poc-chat@0.0.0 pretest
+> tsc -b packages/shared/tsconfig.json
+
+
+> rosetta-poc-chat@0.0.0 test
+> vitest run --passWithNoTests
+
+
+ RUN  v5.0.0 [TARGET]/agents/TEMP/inc14/publication
+
+
+ Test Files  36 passed (36)
+      Tests  437 passed (437)
+   Start at  01:39:31
+   Duration  4.14s (tests 38%, environment 22%, import 20%, transform 15%, setup 5%, worker 1%)
+
+
+> rosetta-poc-chat@0.0.0 build
+> tsc -b tsconfig.json && npm run build -w @rosetta-poc/chat-web
+
+
+> @rosetta-poc/chat-web@0.0.0 build
+> vite build
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 135 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                  0.36 kB │ gzip:  0.25 kB
+dist/assets/index-CgggfQfP.js  328.68 kB │ gzip: 99.76 kB
+
+✓ built in 88ms
