@@ -494,6 +494,74 @@ original failures and the ENOSPC transcript-retention limitation remain recorded
 only; no complete EXP-002, real-browser E2E or phase-conformance claim. Publication verification
 is recorded separately in the evaluation repository; INC-14 has not started.
 
+### 2026-10-12 | execution-context | INC-14 evidence and close-out: living-doc maintenance gap, fresh clone of `cab37e1`, stopped for final review
+
+**Host and process events — not Rosetta or product results.**
+- INC-14 started from published INC-13 `cab37e175f2916c841068030efd1ac0f0ff9828b` (remote tip verified with `git ls-remote`), in the same saved conversation and checkout.
+- Model: `claude-opus-5-5`. The running host version and effort level are not observable from inside the session. The evaluator reports manual approval, medium effort, strict empty MCP and no Chrome; the last host value recorded is the evaluator-reported `2.1.287` (INC-13).
+- Every runtime command exported the pinned Node 24.21.0 / npm 11.6.2 PATH.
+- No product, test, dependency, settings, account or fixed-contract change.
+
+**Finding: living docs were not maintained per increment** (from the evaluator's frozen initial artifact assessment; preserved, not backdated). At `cab37e1`:
+- `EVIDENCE-MAP.md` still had `TBD` / `Not started` rows for UI work already implemented (INC-08/INC-09) and tested (INC-13), and "tests pending" text for tests already published (INC-10..INC-12);
+- its header claimed incremental maintenance, which had not happened;
+- its AC-001 row said "Re-verified again at INC-14 exit" before any INC-14 run;
+- `README.md` still described INC-05-era status and a placeholder web app; `ARCHITECTURE.md`, `CODEMAP.md` and `TECHSTACK.md` still described the seed; `agents/IMPLEMENTATION.md` stopped at INC-07; `docs/TODO.md` still listed three items completed in INC-00..INC-08.
+
+All of these were rewritten once, in INC-14, from the committed code, tests and this log. `EVIDENCE-MAP.md`, `TODO.md` and `ARCHITECTURE.md` carry the finding in their own text, and the earlier versions remain in git history. README correction was explicitly authorized.
+
+**Changed (docs only):**
+- `EVIDENCE-MAP.md`: 11 FR and 26 AC rows, each with implementation and test paths. Evidence levels are separated: unit, container-integration, real-process, jsdom, manual/probe. Limits L1–L7 are recorded. AC-015 stays out of product.
+- `ASSUMPTIONS.md`: A-007, A-009, A-011, A-012 and A-013 resolved. Each fact is taken from the approved SPECS sections and the source, with a "Verified by" line. A-009's target `docs/CONTEXT.md` already states the rule and is outside INC-14's file list, so it was not edited.
+- `ARCHITECTURE.md`, `CODEMAP.md` (148 tracked files, written by hand; the ignored generator script was not used), `TECHSTACK.md`, `TODO.md`, `agents/IMPLEMENTATION.md`, `README.md` (status plus a run guide), and the PLAN status line.
+- `docs/PATTERNS/*`: unchanged; no new configuration pattern emerged.
+
+**Corrections during the run:**
+1. The fresh-clone command was first proposed as `git clone --branch experiment/EXP-002 --single-branch` without `--no-tags`. The evaluator/orchestrator cancelled it at the approval prompt before it ran, and directed adding `--no-tags` so that unrelated governance refs could not be imported. (The first draft of this entry wrongly attributed the cancellation to a direct human decision; corrected after independent review, 2026-10-12.) It was re-issued with `--no-tags`; the clone has 0 tags and only the EXP-002 refs.
+2. A first `ARCHITECTURE.md` draft gave the shutdown order wrongly (`closeAll` before abort). It was corrected against `bootstrap/shutdown.ts` (SPECS §7.5: drain, abort, `closeAll`, bounded await, `app.close()`, DB close) before validation.
+3. A first `README.md` draft paraphrased the fixed experiment rule, which changed its meaning. The original wording was restored.
+
+**Fresh-clone validation.** The final docs commit does not exist yet, so the clean published `cab37e1` was validated. A new git-ignored directory was created with `mktemp -d` under `agents/TEMP/inc14/`. The public branch was cloned there with `--single-branch --no-tags`. Results:
+- HEAD `cab37e1`, clean tree, no `node_modules`, `dist` or `data`; nothing copied from the working checkout;
+- pinned `npm ci`: exit 0;
+- `npm run check`: exit 0, 36 files / 437 tests, build OK;
+- the tree was still clean afterwards.
+
+`npm ci` also printed an audit notice of 3 vulnerabilities (2 moderate, 1 high). It is recorded as an observation only; no dependency was changed, and it is listed in `docs/TODO.md`. **The evaluator must fresh-clone revalidate the final publication commit**; Claude Code has not validated it.
+
+**Working-checkout validation** after the doc edits: pinned `npm run check` exit 0, 36 files / 437 tests, build OK; `git diff --check` exit 0. The logs are in the git-ignored `agents/TEMP/inc14/` (`fresh-clone.log`, `fresh-npm-ci.log`, `fresh-npm-check.log`, `working-npm-check.log`). The disposable clone directory `agents/TEMP/inc14/fresh-clone.7N1Mcd/` was left in place, not deleted.
+
+**AC-026 coverage.** This log has entries covering INC-00 through INC-14: missed requirements, manual and review corrections, specification corrections, host/session interruptions, rejected proposals, and evaluator findings. One style observation: entries from INC-06 onward use categories (`execution-context`, `publication-context`, `planning-context`, `plan-refinement`, `independent-review-context`, `evaluator`) beyond the four named in this file's header. They are kept as written, not renamed.
+
+**Limits, unchanged by INC-14:**
+- the INC-10 throwing-callback coverage exclusion (L1);
+- seeded interruptions, not power loss (L2);
+- jsdom versus real browser (L3);
+- the stale ignored phase ledger, deliberately not repaired (L4);
+- the INC-13 ENOSPC transcript gap (L5).
+
+AC-015 is out of product. No GOV-004 ref or artifact was read, diffed or checked out, and fresh-clone application checks do not prove fresh-agent recovery. No full phase conformance or EXP-002 completion is claimed. Nothing was staged, committed, pushed or tagged.
+
+## INC-14 independent documentation review — 2026-10-12
+
+The evaluator reviewed the ten-file documentation diff after Claude stopped. No product, test,
+dependency, settings or fixed requirement/acceptance file changed. Claude corrected startup-error
+wording, identical injected-clock/id qualification for AC-003, evaluator-versus-human attribution
+and the stale deferred-items summary after independent feedback. Original draft findings remain
+in the evaluation record. Actor self-review separately corrected shutdown order and restored
+the original README experiment rule before that feedback.
+
+Only after the actor stopped, the evaluator reconciled AC-015 from the already separate published
+GOV-004/004B reports: technical reconstruction passed, approval-state recovery failed. The evidence
+map now explicitly marks the complete recovery claim Failed, rather than exempting it. No governance
+artifact was supplied to the implementation actor. This honors the fixed completion rule and is
+not a product change or a new experiment. Fresh final-tree validation and publication remain.
+
 ## Deferred items carried from `docs/TODO.md`
 
-- (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)
+- Historical (pre-implementation): the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7; nothing was deferred at that point.
+- Current, as of INC-14 (2026-10-12): four open follow-ups, all in `docs/TODO.md`:
+  1. P2: review the `npm audit` findings (3 vulnerabilities from the fresh-clone `npm ci`). A dependency change would need a recorded study deviation.
+  2. P3: test a throwing SSE consumer callback (EVIDENCE-MAP limit L1).
+  3. P3: dedicated tests for both env parsers and `http-client.ts` (limit L6).
+  4. P3: automated real-browser E2E (limit L3).

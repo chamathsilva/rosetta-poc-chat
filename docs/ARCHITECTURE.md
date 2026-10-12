@@ -1,73 +1,95 @@
 # ARCHITECTURE
 
 Purpose: technical architecture of this workspace for every AI session: modules, workspace structure, build, testing, building blocks, constraints.
-Style: terse bullets; INSTALLED (exists in code at seed) strictly separated from INTENDED (target from fixed docs, not built). No business context: see `docs/CONTEXT.md`. File tree: `docs/CODEMAP.md`. Versions: `docs/TECHSTACK.md`, `docs/DEPENDENCIES.md`. Config conventions: `docs/PATTERNS/INDEX.md`. Progress: `agents/IMPLEMENTATION.md`.
+Style: terse bullets; INSTALLED facts only (what exists in code). No business context: see `docs/CONTEXT.md`. File tree: `docs/CODEMAP.md`. Versions: `docs/TECHSTACK.md`, `docs/DEPENDENCIES.md`. Config conventions: `docs/PATTERNS/INDEX.md`. Progress: `agents/IMPLEMENTATION.md`. Exact contracts: `plans/chat-poc/chat-poc-SPECS.md` (referenced by section, not restated). Requirement → file → test map: `docs/experiment/EVIDENCE-MAP.md`.
 
 ## Status
 
-- HEAD = `chat-seed-v1`. Only toolchain/workspace wiring exists. All three source modules are placeholders.
-- Architecture below "Intended" is a boundary from `docs/REQUIREMENTS.md`, not a design. Concrete module/file layout is undecided and belongs to the EXP-002 tech spec.
+- Updated in INC-14 (2026-10-12) to match published commit `cab37e1`. INC-00..INC-13 are implemented and tested; INC-14 is docs/close-out only.
+- Before INC-14 this file still described the seed (placeholders, "Intended, NOT built"). It was not maintained increment by increment; see `docs/experiment/EXPERIMENT-LOG.md` (INC-14 entry).
 
-## Workspace Structure (installed)
+## Workspace Structure
 
 - npm workspaces monorepo, ESM (`"type": "module"`) everywhere, all packages `private`, deps exact-pinned.
-- `apps/api` -> `@rosetta-poc/chat-api`: Fastify API. `src/index.ts` = `export {}` placeholder.
-- `apps/web` -> `@rosetta-poc/chat-web`: React + Vite SPA. `src/main.tsx` renders static `SeedPlaceholder`; `index.html` mounts `#root`.
-- `packages/shared` -> `@rosetta-poc/chat-shared`: shared Zod contracts. `src/index.ts` = `export {}` placeholder. Exports `./dist/index.js` + `./dist/index.d.ts` (consumers resolve BUILT output).
-- Dependency direction: api -> shared, web -> shared. api and web never import each other.
-- Root `tsconfig.json`: solution file, `references` to all 3 packages, `files: []`.
-- `tsconfig.base.json`: ES2024, strict + noUncheckedIndexedAccess, exactOptionalPropertyTypes, noImplicitOverride, noFallthroughCasesInSwitch, noUnusedLocals/Parameters, verbatimModuleSyntax (use `import type`), skipLibCheck.
-- api/shared: `module`/`moduleResolution` NodeNext (relative imports need `.js` extension), emit to `dist`.
-- web: `module` ESNext, `moduleResolution` Bundler, `jsx` react-jsx, lib DOM; tsc emits only types to `dist/types`, Vite bundles.
+- `packages/shared` → `@rosetta-poc/chat-shared`: Zod contracts (`contracts/{conversation,message,response,events,errors,params,health}.ts`), branded ids (`ids.ts`), zero-dependency domain rules (`domain-rules/{normalize,title,terminal}.ts`). Exports built `dist`.
+- `apps/api` → `@rosetta-poc/chat-api`: Fastify API, layered `config` → `domain` → `ports` → `persistence` / `provider` / `stream` → `usecases` → `http` → `bootstrap` → `index.ts` (SPECS §2.1, dependency rules §2.2).
+- `apps/web` → `@rosetta-poc/chat-web`: React SPA: `config/env.ts`, `api/{http-client,sse-client}.ts`, `state/{chat-reducer.ts,ChatProvider.tsx,ui-status.ts}`, `hooks/{useResponseStream,useSelectedConversation}.ts`, `components/*.tsx`, `main.tsx`.
+- Dependency direction: api → shared, web → shared. api and web never import each other.
+- `tsconfig.base.json`: ES2024, strict + noUncheckedIndexedAccess, exactOptionalPropertyTypes, noImplicitOverride, noFallthroughCasesInSwitch, noUnusedLocals/Parameters, verbatimModuleSyntax, skipLibCheck.
+- api/shared: NodeNext (relative imports carry `.js`), composite, emit `dist`. api `types: ["node"]`.
+- web: ESNext/Bundler, `jsx: react-jsx`, DOM libs, `types: ["vite/client"]`; tsc emits types only, Vite bundles.
 
-## Build and Scripts (installed)
+## Build and Scripts (A-012 resolved)
 
-- Root: `build`, `typecheck` fan out via `--workspaces --if-present`; `test` = `vitest run --passWithNoTests`; `test:watch`; `check` = typecheck && test && build.
-- api/shared: `build` = `tsc -p`, `typecheck` = `tsc -p --noEmit`.
-- web: `build` = `tsc --noEmit && vite build`; `typecheck` = `tsc --noEmit`.
-- Seed verification (AC-001): `nvm use && npm ci && npm run check` (Node 24.21.0 via `.nvmrc`; `engines.node >=24`).
-- ABSENT: `dev`/`start` scripts, API entrypoint/listen, ports, Vite proxy, env config, lint/format tool, CI config.
+- api and web tsconfigs `reference` `packages/shared`; the root `tsconfig.json` references all three. `tsc -b` builds in dependency order.
+- Root scripts:
+  - `typecheck` = `tsc -b tsconfig.json && tsc -p tsconfig.test.json --noEmit` (product + test files);
+  - `build` = `tsc -b tsconfig.json` then `vite build` for web;
+  - `pretest` builds shared;
+  - `test` = `vitest run --passWithNoTests`;
+  - `check` = typecheck && test && build;
+  - `dev:api` builds shared + api, then `node dist/index.js`;
+  - `dev:web` builds shared, then `vite`.
+- Runtime: Node 24.21.0 via `.nvmrc`, npm 11.6.2 (`packageManager`); `engines.node >=24`.
+- Absent by decision: lint/format tool (A-014), CI config, Vite dev proxy (the browser calls the API cross-origin, so CORS is exercised).
 - Ignored by git: `node_modules/ dist/ coverage/ data/ *.sqlite* *.tsbuildinfo *.log agents/TEMP/ refsrc/`.
 
-## Testing (installed)
+## Configuration (A-007 resolved; SPECS §7.1, §7.2)
 
-- Single root `vitest.config.ts`; include globs: `apps/**/*.test.ts`, `apps/**/*.test.tsx`, `packages/**/*.test.ts`; `clearMocks: true`.
-- Test tooling installed at root: Vitest, @testing-library/react, @testing-library/user-event, jsdom.
-- No tests exist. No `environment` set (Vitest default `node`): React component tests need jsdom via config or per-file directive.
-- `packages/**/*.test.tsx` not matched by globs.
+- API, `apps/api/src/config/env.ts`, Zod fail-fast at boot (exit 1, values never printed):
+  - `CHAT_DB_PATH` = `./data/chat.sqlite` (`:memory:` allowed);
+  - `CHAT_API_PORT` = 8787;
+  - `CHAT_API_HOST` = `127.0.0.1`;
+  - `CHAT_WEB_ORIGIN` = `http://localhost:5173`;
+  - `CHAT_LOG_LEVEL` = `info`.
+- Web, `apps/web/src/config/env.ts`: `VITE_API_BASE_URL` = `http://localhost:8787`.
+- No provider-selection variable: substitution is only via `createContainer(config, overrides)` (FR-003, no env backdoors).
 
-## Known Wiring Risks (seed)
+## Persistence (A-011 resolved; SPECS §5)
 
-- api/web tsconfigs have no `references` to shared and shared exports `dist`: once code imports shared, shared must be built before api/web typecheck/build. Root fan-out order is not guaranteed dependency-aware. Unverified: see `docs/ASSUMPTIONS.md`.
-- `vite.config.ts` is outside web tsconfig `include` (not typechecked).
+- `node:sqlite` `DatabaseSync`, one long-lived synchronous handle, opened with WAL, `foreign_keys = ON`, `busy_timeout = 5000`.
+- Four tables, deterministic schema creation (SPECS §5.2). Partial unique index `ux_responses_one_active_per_conversation` backs the one-active-response gate.
+- `unit-of-work.ts`: explicit `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK`; synchronous only, so a Promise-returning callback is rejected.
+- App-generated UUID ids via an injected `IdGenerator`; ordering by stored sequence/tie-break, never timestamp alone. Rows are re-validated with shared Zod schemas on read.
 
-## Intended Architecture (target, NOT built)
+## Runtime building blocks
 
-Fixed technology (change = recorded study deviation, FR "Fixed technology boundary"):
-- Node.js 24.21.0, TypeScript 7.0.2 strict, React 19.3.0 + Vite 8.3.0, Fastify 5.12.4 (+ @fastify/cors), Zod 4.6.5.
-- Persistence: Node built-in SQLite module (no npm SQLite dependency). Configurable DB path; deterministic schema creation.
-- Streaming: Server-Sent Events over HTTP (`text/event-stream`). WebSockets excluded.
-- Tests: Vitest 5.0.0 + Testing Library.
+- Provider: `provider/deterministic-provider.ts` (default, no network or credentials); `testing/provider-doubles.ts` for delay, disconnect and failure in tests only.
+- Stream: `stream/runner.ts` persists each event before publishing to `stream/hub.ts` (keyed by response id). `stream/subscribe.ts` does a synchronous replay → live handoff with sequence dedupe and detaches its subscriber on failure. `stream/recovery.ts` turns non-terminal responses into `failed` before listen (SPECS §5.6).
+- HTTP: `http/server.ts`:
+  - exact-origin CORS;
+  - strict shared-schema parsing;
+  - a fixed JSON error envelope (`http/error-envelope.ts`) with no stacks, SQL or paths;
+  - an exhaustive log-field allowlist (`http/logging.ts`, no message text).
+- SSE: `http/sse.ts` frames, with heartbeat `: ping` every 15 s.
+- Routes (contract SPECS §4.3): `POST/GET /api/conversations`, `GET /api/conversations/:conversationId`, `POST /api/conversations/:conversationId/messages` (202), `POST /api/responses/:responseId/retry`, `GET /api/responses/:responseId/events` (SSE, `Last-Event-ID` validated before headers), `GET /health`.
+- Bootstrap: `bootstrap/container.ts` composition root.
+  - `bootstrap/shutdown.ts` handles SIGINT/SIGTERM in SPECS §7.5 order: start draining (503s), abort in-flight runs, `hub.closeAll()`, await the runs bounded by `SHUTDOWN_TIMEOUT_MS = 5000`, `app.close()`, then close the DB.
+  - `index.ts` binds `app.server` directly so Fastify's listen URL is never logged (SPECS §7.4/§7.5).
+- Web:
+  - `ChatProvider` dispatches send/retry/load results only if the selection generation is unchanged, and retains network-failure send keys per conversation;
+  - `useResponseStream` reconnects from `lastAppliedEventId` with backoff 250/500/1000/2000/4000 ms, at most 6 attempts, cancelled on selection change and unmount;
+  - `useSelectedConversation` keeps the selection in URL `?c=`;
+  - SSE uses `fetch` streaming, never `EventSource`;
+  - text renders as text, with no raw-HTML API.
 
-Required separation of concerns (quality requirements; layout TBD):
-- shared contracts: Zod schemas for every API body, param, SSE payload; used by both api and web (AC-004).
-- domain state: conversation/message/response/event rules, retry, idempotency.
-- persistence: SQLite repositories, atomic user-message + response creation, ordering not by timestamp alone.
-- provider: injected interface; deterministic default mock; test doubles for delay/disconnect/failure (no magic prompts, no env backdoors).
-- stream coordination: persist-then-emit, per-response monotonically increasing integer event IDs, `Last-Event-ID` replay, one terminal event.
-- HTTP transport: Fastify routes, consistent JSON error envelope (code, message, requestId, optional details; no stack traces), CORS = configured web origin only.
-- UI state: idempotent event application, reconnect from last applied ID, URL-restored selection, accessible status.
+## Testing (A-013 resolved; SPECS §8.3, §10)
 
-Endpoints (contract in FR-002/FR-004; do not duplicate here):
-- `POST/GET /api/conversations`, `GET /api/conversations/:conversationId`, `POST /api/conversations/:conversationId/messages` (202), `POST /api/responses/:responseId/retry`, `GET /api/responses/:responseId/events` (SSE), `GET /health`.
+- Root `vitest.config.ts` has two projects:
+  - `node`: `apps/api/src/**/*.test.ts`, `packages/shared/src/**/*.test.ts`;
+  - `web`: `environment: "jsdom"`, `apps/web/src/**/*.test.{ts,tsx}`, `setupFiles: apps/web/test/setup.ts` (`afterEach(cleanup)`, stream/decoder presence guards).
+- `clearMocks: true`.
+- Test files are typechecked separately by `tsconfig.test.json`.
+- Layers at `cab37e1`: 36 files / 437 tests:
+  - unit (INC-10);
+  - API integration + SQLite/restart, including real child-process tests of built `dist/index.js` (INC-11);
+  - SSE replay (INC-12);
+  - React component/provider/hook under jsdom with stubbed `fetch` (INC-13).
+- Rules: test-owned temp databases (`testing/temp-db.ts`), `fakeClock` + `sequentialIds` where output stability matters, owned-resource cleanup.
+- Not present: real-browser E2E (manual observations only), lint.
 
-SSE event types: `response.started`, `response.delta`, `response.completed`, `response.failed`.
+## Constraints
 
-Operational (FR-011): graceful shutdown (stop new work, close streams, close SQLite); structured logs with IDs, lengths, status, error codes only (never message text, not truncated); no `any` in product code; no telemetry.
-
-## Intended Test Layers (target, NOT built)
-
-- Unit: contracts, stream reduction, validation, idempotency, redaction-safe errors.
-- API integration: routes, SQLite persistence, event replay, restart recovery, retry.
-- Component: sending, streaming, reconnection, error, retry, accessible status.
-- Rules: temporary databases; deterministic clocks/IDs where output stability matters. Full list: AC-024, AC-012, AC-019.
+- Fixed technology (change = recorded study deviation): Node 24.21.0, TypeScript 7.0.2 strict, React 19.3.0 + Vite 8.3.0, Fastify 5.12.4 + @fastify/cors 11.3.0, Zod 4.6.5, `node:sqlite`, SSE (no WebSockets), Vitest 5.0.0 + Testing Library.
+- No `any` in product code; no telemetry; logs carry ids, lengths, status and error codes only.
+- The direct `app.server` bind relies on Node ≥ 19 `server.close()` closing idle keep-alive sockets (covered by a real-process test).
