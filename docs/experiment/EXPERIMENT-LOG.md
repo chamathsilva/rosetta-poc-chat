@@ -428,6 +428,72 @@ The account, Git identity, Rosetta 3.1.13 plugin, strict empty MCP, disabled Chr
 
 **Limits.** SSE stream tests only; React components (INC-13) are not covered. The ignored workflow ledger was not repaired, and full phase conformance is not claimed. Nothing was staged, committed or pushed, and INC-13 has not started.
 
+### 2026-10-12 | execution-context | INC-13 React tests: ENOSPC interruption, harness corrections, review strengthening, validated, stopped for final review
+
+Date label: the client/author date is 2026-10-12 (America/Chicago). An earlier draft of this heading used the host-local label 2026-10-11. Raw log and run timestamps are unchanged.
+
+**Host and process events — not Rosetta or product results.**
+- INC-13 started from published INC-12 `c7683df3e14800889fb06344366b67087ac2c5b6`, in the same saved conversation and the same checkout.
+- Native session metadata (reported by the evaluator) shows the running host `2.1.287`, model `claude-opus-5-5`. Separately, the shell's installed `claude` binary (in the pinned Node bin directory) reported `2.1.296`. That is an installed-binary observation, **not** the running-host version.
+- From inside the session, the effort level is not observable; the evaluator reports medium. The permission posture is manual one-time approval. Strict empty MCP and no Chrome were preserved.
+- **ENOSPC interruption.** The disk filled up. The first `ChatProvider.test.tsx` Write failed with `ENOSPC: no space left on device` (on its temp file), and the provider test run failed before starting because the Bash tool could not create its output file. No result is claimed for either. The host also warned that **transcript writes failed**, so recent messages may be missing from disk; complete transcript evidence is **not** claimed for this period.
+- The author freed space. Independent verification found 11 GiB available, HEAD unchanged, only the preserved hook test untracked, both hook logs intact, and no provider file or temp fragment. The evaluator saved INC-13 resume evidence.
+- The account and authentication, frozen Rosetta 3.1.13 and the Chamath Git identity were reconfirmed. No account or configuration switch, and no product, dependency, settings or fixed-contract change.
+
+**Initially added: 3 test files, 25 tests, measured with the JSON reporter.** All IO tests stub `fetch`; there is no real network, no native SSE object and no polyfill.
+
+| File | Tests | Covers |
+|---|---|---|
+| `hooks/useResponseStream.test.ts` | 11 | the §6.5 backoff `250/500/1000/2000/4000/4000` ms checked to the millisecond (fake `setTimeout` only); after 6 attempts a `network` error with action `reload`; resume from `lastAppliedEventId`; attempt reset after a successful event; cancellation on selection change and unmount, both for a live request and a pending reconnect; no stream for terminal responses; an HTTP error closes with no reconnect |
+| `state/ChatProvider.test.tsx` | 8 | INC-09 carry-forwards, using deferred fetches the test settles explicitly: delayed send error and send success, and a delayed retry error, each released after a selection change (nothing shown; the newly selected draft and sending state unchanged); a stale send and a stale load across A → B → A; no reload of the selected conversation; retained send keys reused within A, fresh for the same text in B, released after a non-network failure; StrictMode + `?c=` with one load, one live stream and the text seeded once |
+| `components/App.test.tsx` | 6 | the six named tests — **AC-002**, **AC-013**, **AC-018**, **AC-020**, **AC-022** (`tab()`/`keyboard()` only) and **FR-008** — over the real `App` under StrictMode and an in-memory fake API whose SSE frames are pushed explicitly |
+
+**Failures and corrections, all retained** in the git-ignored `agents/TEMP/inc13/`; no product defect was exposed:
+1. `run-hook-1.log` (exit 1; 1 failed, 9 passed). A test-logic error: one test merged "unmount cancels a pending reconnect" with "unmount aborts the request" after the request had already ended through a drop. It was split into two tests (`run-hook-2.log`, exit 0, 11 passed).
+2. The blocked provider Write was repeated after the disk space was freed (`run-provider-1.log`, exit 0, 8 passed). It differs from the blocked draft only in dropping an unused import and in waiting for the list request before answering it in the StrictMode test.
+3. `run-app-1.log` (exit 1; 6 failed). A harness error: the tests used `@testing-library/jest-dom` matchers, but jest-dom is not a dependency. They were replaced with plain DOM assertions; no dependency was added.
+4. `run-app-2.log` (exit 1; 1 failed, 5 passed). A wrong expectation: after a retry, the failed **original** response correctly stays visible as its own item with no streamed text. The assertion now checks the failed original and the replacement's completed text exactly once (`run-app-3.log`, exit 0, 6 passed, zero act warnings).
+
+**Validation**, each command run separately with its exit captured:
+- targeted three files: exit 0, 25 tests (`inc13-counts.json`);
+- `npm run typecheck`: exit 0;
+- `npm run check`: exit 0, 36 files / 436 tests (the 411 existing tests unchanged, plus 25 new), build OK;
+- `git diff --check`: exit 0;
+- a grep for `EventSource`, `dangerouslySetInnerHTML` and `innerHTML` in `apps/web/src` and `index.html`: none.
+
+The counts above (25 tests; 436 total) are the **initial** INC-13 results, kept as recorded.
+
+**Independent initial review: test strength PARTIAL, two gaps.** The evaluator found that the 25 new tests and the full 436 / typecheck / build all passed, but that two cases were weaker than the carry-forwards require.
+- **Evaluator evidence, not a Claude Code run:** in a bounded disposable copy with all three generation guards disabled, 4 of the 8 initial provider tests failed.
+
+The gaps were closed with test-only changes:
+1. **New provider case**, the existing one kept. A's send is held; B is selected; B's own send is started and kept pending, so `sending = true` and B's optimistic message is on screen. Then A's network error is released. The test proves B's draft, `sending` flag, optimistic message, `lastError` and announcement are all unchanged, then releases B normally (`run-provider-2.log`, exit 0, 9 passed).
+2. **Strengthened App retry test.** The fake API gained `holdNext`, plus a teardown `releaseAll` so a held request can never stay pending. The retry request is held in flight; the still-mounted Retry is disabled (status "Retrying…"); a second click issues no request. The request is then released and the replacement completed. The test now asserts the two exact assistant items instead of filtering empty strings:
+   - the failed original: no streamed text, "Response failed", the fixed failure text, no button;
+   - the completed replacement: its text and "Response complete".
+
+   Result: `run-app-4.log`, exit 0, 6 passed, zero act warnings.
+
+The original logs and `inc13-counts.json` are unchanged; the final results use distinct files.
+
+**Final validation**, each command run separately with its exit captured:
+- targeted three files: exit 0, **26** tests — hook 11, provider 9, App 6 (`inc13-counts-final.json`);
+- `npm run typecheck`: exit 0 (`gate-final-typecheck.log`);
+- `npm run check`: exit 0, 36 files / **437** tests (411 existing, unchanged, plus 26 new), build OK (`gate-final-npm-check.log`);
+- `git diff --check`: exit 0.
+
+**Limits.** These are jsdom component tests, not a real-browser pass. The ignored workflow ledger was not repaired, and full phase conformance and clean-clone recovery are not claimed. Nothing was staged, committed or pushed, and INC-14 has not started.
+
+### 2026-10-12 | evaluator | INC-13 accepted for publication
+
+Independent final check passed 437 tests/36 files, product/test typecheck and build (exit 0).
+The new pending-B test rejects a disposable generation-guard mutant (1 failed/8 skipped);
+the strengthened Retry test rejects removal of in-flight disabling (1 failed/5 skipped).
+These are evaluator probes, not Claude runs or product changes. Initial partial judgment,
+original failures and the ENOSPC transcript-retention limitation remain recorded. Accept INC-13
+only; no complete EXP-002, real-browser E2E or phase-conformance claim. Publication verification
+is recorded separately in the evaluation repository; INC-14 has not started.
+
 ## Deferred items carried from `docs/TODO.md`
 
 - (none currently — the Rosetta source commit and exact released plugin artifact hash were resolved from the frozen-release evidence before Phase 7.)
